@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { STEPS } from './constants';
 import { ROBOT_CODEBASE } from './codebase';
 import { StepCard } from './components/StepCard';
-import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon, AutopilotIcon, TrafficLightIcon, FollowIcon, FindBookIcon, ExploreIcon, BrainIcon as SparklesIcon, ChatBubbleLeftRightIcon, TrashIcon, PlayIcon } from './components/Icons';
+import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon, AutopilotIcon, TrafficLightIcon, FollowIcon, FindBookIcon, ExploreIcon, BrainIcon as SparklesIcon, ChatBubbleLeftRightIcon, TrashIcon, PlayIcon, CogIcon, CameraIcon } from './components/Icons';
 import type { LogEntry, LogLevel, CustomResponse } from './types';
 
 declare const JSZip: any;
@@ -25,6 +25,9 @@ const App: React.FC = () => {
   ]);
   const [newQuestion, setNewQuestion] = useState<string>('');
   const [newAnswer, setNewAnswer] = useState<string>('');
+  
+  // State for wake word
+  const [wakeWord, setWakeWord] = useState<string>('hey saras');
 
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -62,11 +65,23 @@ const App: React.FC = () => {
     setLogs(prevLogs => [...prevLogs, newLog]);
   };
   
-  const handleAction = (command: string, response: string) => {
+  const handleAction = (command: string, response: string, text?: string) => {
     addLog('System', 'command', command);
     // Here you would typically send the command to the robot's API
     // For this simulation, we just add a delayed response.
     setTimeout(() => addLog('Robot', 'response', response), 500);
+  };
+
+  const handleSetWakeUpWord = () => {
+    if (!wakeWord.trim()) {
+      addLog('System', 'error', 'Wake word cannot be empty.');
+      return;
+    }
+    addLog('System', 'command', `Setting wake word to "${wakeWord}"...`);
+    // Mock API call
+    setTimeout(() => {
+        addLog('Robot', 'response', 'Wake word updated successfully.');
+    }, 500);
   };
 
   const handleAddResponse = () => {
@@ -294,6 +309,34 @@ const App: React.FC = () => {
               </div>
             </div>
             
+             <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
+                <div className="flex items-center mb-4">
+                    <CogIcon className="h-5 w-5 mr-3 text-cyan-400" />
+                    <h3 className="text-lg font-semibold text-white">AI Settings</h3>
+                </div>
+                <div className="space-y-3">
+                    <label htmlFor="wake-word" className="block text-sm font-medium text-gray-300">Custom Voice Wake Word</label>
+                    <div className="flex items-center space-x-2">
+                        <input
+                            id="wake-word"
+                            type="text"
+                            value={wakeWord}
+                            onChange={(e) => setWakeWord(e.target.value)}
+                            disabled={!isConnected}
+                            className="flex-grow bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
+                            placeholder="e.g., Hey Saras"
+                        />
+                        <button
+                            onClick={handleSetWakeUpWord}
+                            disabled={!isConnected || !wakeWord.trim()}
+                            className="px-4 py-2 text-sm bg-cyan-600 hover:bg-cyan-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-semibold"
+                        >
+                            Save
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
                <div className="flex items-center mb-4">
                  <AutopilotIcon className="h-5 w-5 mr-3 text-cyan-400" />
@@ -341,10 +384,12 @@ const App: React.FC = () => {
              <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4">AI Actions</h3>
               <div className="grid grid-cols-2 gap-4">
-                 <button onClick={() => handleAction('Wake Word', 'Listening...')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SparklesIcon className="h-5 w-5 mr-2" />Wake Word</button>
+                 <button onClick={() => handleAction('Describe Scene', 'I see a desk with a computer and a window.')} disabled={!isConnected} className="col-span-2 flex items-center justify-center p-3 bg-gray-700/50 rounded-md hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors animate-rgb-border-glow font-semibold text-lg">
+                    <CameraIcon className="h-6 w-6 mr-3" />See & Describe Scene
+                 </button>
+                 <button onClick={() => handleAction('wake_word', 'Listening...')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SparklesIcon className="h-5 w-5 mr-2" />Test Wake Effect</button>
                  <button onClick={() => handleAction('Introduce Yourself (Gujarati)', 'હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><RobotIcon className="h-5 w-5 mr-2" />Introduce (Gujarati)</button>
                  <button onClick={() => handleAction('Find a Book', 'Searching for a book... Found one!')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><FindBookIcon className="h-5 w-5 mr-2" />Find a Book</button>
-                 <button onClick={() => handleAction('Describe Scene', 'I see a desk with a computer and a window.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><VisionIcon className="h-5 w-5 mr-2" />Describe Scene</button>
                 <button onClick={() => handleAction('Scan Question', 'The question is "What is the capital of France?". The answer is Paris.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ScanIcon className="h-5 w-5 mr-2" />Scan Question</button>
               </div>
             </div>

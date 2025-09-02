@@ -15,6 +15,7 @@ import {
   HandWavingIcon,
   ExploreIcon,
   ChatBubbleLeftRightIcon,
+  MicIcon,
 } from './components/Icons';
 
 export const STEPS: Step[] = [
@@ -38,7 +39,8 @@ export const STEPS: Step[] = [
 │   ├── led_control.py
 │   ├── motor_control.py
 │   ├── object_detector.py
-│   └── ultrasonic.py
+│   ├── ultrasonic.py
+│   └── wake_word.py
 └── utils/
     ├── __init__.py
     └── text_to_speech.py
@@ -48,9 +50,12 @@ export const STEPS: Step[] = [
     id: 2,
     title: 'Hardware & Environment Setup',
     icon: HardwareIcon,
-    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. You will also need to download pre-trained object detection model files (like YOLOv3-tiny) and place them in the 'models' directory.`,
+    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. You will also need to download pre-trained object detection model files (like YOLOv3-tiny) and place them in the 'models' directory. For the new wake word feature, you'll need a USB microphone connected to the Pi and must install a system dependency for it.`,
     code: `
 # Open a terminal on your Raspberry Pi and run these commands:
+# Install system dependency for microphone audio
+sudo apt-get update && sudo apt-get install -y portaudio19-dev
+
 # Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
@@ -77,32 +82,31 @@ from core import object_detector, motor_control
 app = Flask(__name__)
 
 # Global state for robot
-LATEST_DETECTIONS = []
-AUTOPILOT_MODE = 'off'
-CUSTOM_RESPONSES = {}
+STATE = {
+    "latest_detections": [],
+    "autopilot_mode": "off",
+    "custom_responses": {},
+    "wake_word": "hey saras"
+}
 
 def detection_loop():
-    """Continuously runs object detection on camera feed."""
-    global LATEST_DETECTIONS
-    detector = object_detector.ObjectDetector()
-    while True:
-        LATEST_DETECTIONS = detector.detect_objects()
-        # Add logic for proactive greetings here
-        # time.sleep(0.1)
-
+    # ... continuously runs object detection ...
+    pass
+    
 def autopilot_loop():
-    """Runs autopilot logic based on current mode and detections."""
-    while True:
-        if AUTOPILOT_MODE == 'traffic':
-            # Check LATEST_DETECTIONS for traffic lights/signs
-            # and call motor_control functions
-            pass
-        # time.sleep(0.1)
+    # ... runs autopilot logic ...
+    pass
+    
+def wake_word_loop():
+    # ... listens for wake word ...
+    pass
 
 if __name__ == '__main__':
     # Start background threads
     threading.Thread(target=detection_loop, daemon=True).start()
     threading.Thread(target=autopilot_loop, daemon=True).start()
+    threading.Thread(target=wake_word_loop, daemon=True).start()
+    
     app.run(host='0.0.0.0', port=5001, threaded=True)
 `,
   },
@@ -216,7 +220,7 @@ def autopilot_loop():
     id: 8,
     title: 'Intelligent Actions & Personality',
     icon: RobotIcon,
-    description: `We can trigger special actions and animations. A 'Wake Word' command can initiate a Google Assistant-style light effect, and other commands can trigger specific behaviors like the Gujarati introduction. The robot can also proactively greet people it sees.`,
+    description: `We can trigger special actions and animations. A command can initiate a Google Assistant-style light effect, and other commands can trigger specific behaviors like the Gujarati introduction. The robot can also proactively greet people it sees.`,
     code: `
 # Add this command to the handler in main.py
 from core import led_control
@@ -243,6 +247,45 @@ def assistant_wakeup_animation():
   },
   {
     id: 9,
+    title: 'Customizable Wake Word',
+    icon: MicIcon,
+    description: `Make the robot truly hands-free by implementing a customizable voice wake word. The robot will use its microphone to continuously listen for a specific phrase (e.g., "Hey Saras"). When detected, it will trigger the "listening" LED animation. The wake word can be changed from the web UI.`,
+    code: `
+# Add to main.py
+from core import wake_word
+
+STATE = { "wake_word": "hey saras", ... }
+
+@app.route('/set-wake-word', methods=['POST'])
+def set_wake_word():
+    word = request.json.get('wake_word', '').lower()
+    if word:
+        STATE["wake_word"] = word
+        return jsonify(status="success")
+    return jsonify(status="error")
+
+# In core/wake_word.py
+import speech_recognition as sr
+
+def listen_for_wake_word(get_wake_word_func, callback_func):
+    r = sr.Recognizer()
+    mic = sr.Microphone()
+    with mic as source:
+        r.adjust_for_ambient_noise(source)
+    
+    while True:
+        with mic as source:
+            audio = r.listen(source)
+        try:
+            text = r.recognize_google(audio).lower()
+            if get_wake_word_func() in text:
+                callback_func()
+        except sr.UnknownValueError:
+            pass # Ignore if speech is not understood
+`
+  },
+  {
+    id: 10,
     title: 'Customizing AI Responses',
     icon: ChatBubbleLeftRightIcon,
     description: `You can teach Saras new things! The robot's backend can store a dictionary of custom question-and-answer pairs. A dedicated API endpoint allows the web UI to send and update these responses, making the robot's personality fully customizable.`,
@@ -255,44 +298,44 @@ CUSTOM_RESPONSES = {}
 def handle_custom_responses():
     global CUSTOM_RESPONSES
     data = request.json
-    # The UI sends a list of {"question": q, "answer": a}
-    # We convert it to a dictionary for fast lookups
-    responses_list = data.get('responses', [])
-    CUSTOM_RESPONSES = {item['question']: item['answer'] for item in responses_list}
-    print(f"Updated custom responses: {len(CUSTOM_RESPONSES)} items.")
+    # ... logic to update CUSTOM_RESPONSES dict ...
     return jsonify(status="success")
 
 # Modify your command handler to check for custom questions
 def handle_command(command, text):
-    # Check if the text matches a custom question
     if text and text in CUSTOM_RESPONSES:
         answer = CUSTOM_RESPONSES[text]
         text_to_speech.speak(answer)
         return answer
     
-    # ... handle other commands like 'move_forward', 'wake_word' etc.
+    # ... handle other commands
 `,
   },
   {
-    id: 10,
+    id: 11,
     title: 'Gemini API for Advanced Queries',
     icon: BrainIcon,
     description: `For tasks that require understanding beyond simple object detection, like describing a complex scene or answering a scanned question, we use the Google Gemini API. This allows the robot to have rich, contextual conversations.`,
     code: `
 # This code is in 'core/gemini_ai.py'
 import os
-from google.generativeai import GoogleGenAI
-import base64
+import google.generativeai as genai
+from PIL import Image
 
-ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
+genai.configure(api_key=os.environ["API_KEY"])
+model = genai.GenerativeModel('gemini-2.5-flash')
 
-async def get_gemini_response(prompt_text, image_path=None):
-    # ... (same as before)
-    # This is used for "Describe Scene" and "Scan Question"
+def get_gemini_response(prompt_text, image_path=None):
+    if image_path:
+        img = Image.open(image_path)
+        response = model.generate_content([prompt_text, img])
+    else:
+        response = model.generate_content(prompt_text)
+    return response.text
 `,
   },
   {
-    id: 11,
+    id: 12,
     title: 'Avoiding Harmful Creatures',
     icon: BiohazardIcon,
     description: `A key safety feature is the ability to recognize and avoid potential threats. This is implemented within the Autopilot logic. If the object detector identifies a "harmful creature" (e.g., a toy snake, which you would need to train your model to recognize), the robot will immediately stop and move backward.`,
@@ -316,7 +359,7 @@ def autopilot_loop():
 `,
   },
   {
-    id: 12,
+    id: 13,
     title: 'Proactive Greetings',
     icon: HandWavingIcon,
     description: `To make the robot more interactive, it will proactively greet people and dogs. The object detection loop continuously scans for faces. When a new face is detected, it says "Namaste" in Gujarati. A set stores the IDs of greeted individuals to prevent repeated greetings, creating a more natural interaction.`,
@@ -344,7 +387,7 @@ def detection_loop():
 `
   },
   {
-    id: 13,
+    id: 14,
     title: 'Ultrasonic Distance Sensing',
     icon: BeakerIcon,
     description: `The robot is equipped with an ultrasonic sensor to measure distances. This is crucial for the basic obstacle avoidance mode and can be used as a fallback safety measure in other modes. The Yahboom library makes reading from this sensor straightforward.`,

@@ -76,6 +76,9 @@ opencv-python-headless
 numpy
 gunicorn
 RPi.GPIO
+SpeechRecognition
+PyAudio
+Pillow
 `,
   'main.py': `import os
 import threading
@@ -85,7 +88,7 @@ from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 
-from core import motor_control, vision, ultrasonic, ir_remote, led_control
+from core import motor_control, vision, ultrasonic, ir_remote, led_control, wake_word
 from core.camera import Camera
 from core.object_detector import ObjectDetector
 from utils import text_to_speech
@@ -102,7 +105,8 @@ STATE = {
     "autopilot_mode": "off", # 'off', 'avoid', 'traffic', 'follow', 'explore'
     "seen_entities": set(),
     "is_running": True,
-    "custom_responses": {} # Stores question:answer pairs
+    "custom_responses": {}, # Stores question:answer pairs
+    "wake_word": "hey saras" # Default wake word
 }
 
 # --- Initialization ---
@@ -294,6 +298,17 @@ def handle_custom_responses():
     return jsonify(status="success", message="Custom responses updated.")
 
 
+@app.route('/set-wake-word', methods=['POST'])
+def set_wake_word():
+    data = request.json
+    word = data.get('wake_word')
+    if word and isinstance(word, str):
+        STATE["wake_word"] = word.lower().strip()
+        print(f"Wake word updated to: '{STATE['wake_word']}'")
+        return jsonify(status="success", message=f"Wake word set to '{word}'.")
+    return jsonify(status="error", message="Invalid wake word provided.")
+
+
 @app.route('/video_feed')
 def video_feed():
     """Video streaming route that draws detection boxes."""
@@ -330,10 +345,16 @@ if __name__ == '__main__':
         detection_thread = threading.Thread(target=detection_loop, daemon=True)
         autopilot_thread = threading.Thread(target=autopilot_loop, daemon=True)
         ir_thread = threading.Thread(target=ir_remote.ir_control_loop, daemon=True)
+        wake_word_thread = threading.Thread(
+            target=wake_word.listen_for_wake_word,
+            args=(lambda: STATE["wake_word"], led_control.assistant_wakeup_animation),
+            daemon=True
+        )
         
         detection_thread.start()
         autopilot_thread.start()
         ir_thread.start()
+        wake_word_thread.start()
         
         print("Starting Flask server...")
         app.run(host='0.0.0.0', port=5001, threaded=True)
@@ -401,51 +422,39 @@ class Camera:
         return None
 `,
   'core/gemini_ai.py': `import os
-import asyncio
-from google.generativeai import GoogleGenAI
-import base64
+import google.generativeai as genai
+from PIL import Image
 
-# Ensure the API key is set in the environment
-if "API_KEY" not in os.environ:
-    raise ValueError("API_KEY not found in environment variables.")
+# Configure the API key from environment variables
+api_key = os.environ.get("API_KEY")
+if not api_key:
+    raise ValueError("API_KEY not found in environment variables. Please set it in your .env file.")
+genai.configure(api_key=api_key)
 
-ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
+# Initialize the generative model
+model = genai.GenerativeModel('gemini-2.5-flash')
 
-async def get_gemini_response_async(prompt_text, image_path=None):
+def get_gemini_response(prompt_text, image_path=None):
     """
     Gets a response from the Gemini API, with an optional image.
+    This is a synchronous function.
     """
     try:
-        contents = []
         if image_path:
             if not os.path.exists(image_path):
                 return "Error: Image file not found."
-            with open(image_path, "rb") as image_file:
-                encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
             
-            image_part = {
-                "inlineData": {
-                    "mimeType": "image/jpeg",
-                    "data": encoded_string
-                }
-            }
-            contents.append(image_part)
+            img = Image.open(image_path)
+            # The model can take a list of mixed text and image parts
+            response = model.generate_content([prompt_text, img])
+        else:
+            # For text-only prompts
+            response = model.generate_content(prompt_text)
         
-        text_part = {"text": prompt_text}
-        contents.append(text_part)
-
-        response = await ai.models.generateContent({
-            'model': 'gemini-2.5-flash',
-            'contents': {"parts": contents}
-        })
         return response.text
     except Exception as e:
         print(f"Error calling Gemini API: {e}")
         return "I'm sorry, I encountered an error trying to process that."
-
-def get_gemini_response(prompt_text, image_path=None):
-    """Synchronous wrapper for the async Gemini call."""
-    return asyncio.run(get_gemini_response_async(prompt_text, image_path))
 `,
     'core/object_detector.py': `import cv2
 import numpy as np
@@ -726,6 +735,67 @@ def see_and_describe(camera_instance):
     else:
         print("Failed to capture image.")
         return "I'm sorry, I couldn't see anything."
+`,
+  'core/wake_word.py': `import speech_recognition as sr
+import time
+
+def listen_for_wake_word(get_wake_word_func, callback_func):
+    """
+    Continuously listens for a wake word and triggers a callback function.
+    
+    :param get_wake_word_func: A function that returns the current wake word string.
+    :param callback_func: The function to call when the wake word is detected.
+    """
+    recognizer = sr.Recognizer()
+    microphone = sr.Microphone()
+
+    # We calibrate the recognizer for ambient noise once at the start
+    with microphone as source:
+        print("Calibrating microphone for ambient noise... Please be quiet.")
+        try:
+            recognizer.adjust_for_ambient_noise(source, duration=2)
+            print("Calibration complete. Listening for wake word...")
+        except Exception as e:
+            print(f"Could not calibrate microphone: {e}. Using default values.")
+
+    while True:
+        current_wake_word = get_wake_word_func()
+        if not current_wake_word:
+            time.sleep(1) # Wait if no wake word is set
+            continue
+
+        with microphone as source:
+            try:
+                # Listen for a phrase, with timeouts to prevent blocking forever
+                audio = recognizer.listen(source, timeout=5, phrase_time_limit=4)
+            except sr.WaitTimeoutError:
+                # No speech detected, just continue the loop
+                continue
+        
+        try:
+            # Recognize speech using Google's free web API
+            recognized_text = recognizer.recognize_google(audio).lower()
+            print(f"Heard: '{recognized_text}'")
+
+            # Check if the wake word is in the recognized text
+            if current_wake_word in recognized_text:
+                print(f"Wake word '{current_wake_word}' detected!")
+                callback_func()
+                # Optional: pause after detection to avoid re-triggering
+                time.sleep(1) 
+                
+        except sr.UnknownValueError:
+            # This is fine, it just means Google Speech Recognition could not understand the audio
+            pass
+        except sr.RequestError as e:
+            # API was unreachable or unresponsive
+            print(f"Could not request results from Google Speech Recognition service; {e}")
+            time.sleep(5) # Wait before retrying
+        except Exception as e:
+            print(f"An unexpected error occurred in wake word listener: {e}")
+
+        # A small delay to prevent high CPU usage
+        time.sleep(0.1)
 `,
   'utils/__init__.py': ``,
   'utils/text_to_speech.py': `import os

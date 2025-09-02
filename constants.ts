@@ -1,41 +1,79 @@
-
 import type { Step } from './types';
 import {
+  FolderIcon,
   HardwareIcon,
   SoftwareIcon,
   MicIcon,
   LightIcon,
   BrainIcon,
   VisionIcon,
-  RobotIcon
+  RobotIcon,
+  CalculatorIcon
 } from './components/Icons';
 
 export const STEPS: Step[] = [
   {
     id: 1,
+    title: 'Project Setup & Code Structure (Ubuntu/Raspberry Pi)',
+    icon: FolderIcon,
+    description: `Before writing the code, it's crucial to set up a clean and scalable project structure on your robot's operating system (like Ubuntu or Raspberry Pi OS). This keeps your code organized and easy to manage as the project grows.
+
+Here is the recommended directory structure. You can create these folders and empty files using the 'mkdir' and 'touch' commands in your terminal.`,
+    code: `saras_ai_robot/
+├── .env
+├── .gitignore
+├── main.py
+├── requirements.txt
+├── core/
+│   ├── __init__.py
+│   ├── gemini_ai.py
+│   ├── led_control.py
+│   ├── motor_control.py
+│   ├── vision.py
+│   └── wake_word.py
+└── utils/
+    ├── __init__.py
+    └── text_to_speech.py
+
+# --- File Explanations ---
+#
+# .env: Stores your secret API key. (e.g., API_KEY="...")
+# .gitignore: Tells git which files to ignore (e.g., .env, __pycache__).
+# main.py: The main entry point to start the robot.
+# requirements.txt: Lists all the Python libraries needed.
+#
+# core/: Contains the core logic for the robot's main features.
+#   - gemini_ai.py: Handles all communication with the Google Gemini API.
+#   - led_control.py: Manages the RGB light animations.
+#   - motor_control.py: Controls the robot's movements.
+#   - vision.py: Manages the camera and computer vision tasks.
+#   - wake_word.py: Handles listening for "Hey Saras".
+#
+# utils/: Contains helper functions used across the project.
+#   - text_to_speech.py: Converts text responses into spoken audio.
+`,
+  },
+  {
+    id: 2,
     title: 'Hardware & Environment Setup',
     icon: HardwareIcon,
     description: `First, ensure your RASPBOT V2 is correctly assembled. Verify all connections for the Raspberry Pi, camera module, microphone, motor driver, and RGB LEDs.
     
-Then, set up the software environment on your Raspberry Pi. This involves installing required Python libraries that will power the robot's new abilities.`,
+Then, set up the software environment on your Raspberry Pi. This involves installing required Python libraries from your 'requirements.txt' file.`,
     code: `
 # Open a terminal on your Raspberry Pi and run these commands:
 # Update package lists
 sudo apt-get update && sudo apt-get upgrade -y
 
-# Install core libraries
-pip install google-generativeai
-pip install opencv-python-headless
-pip install SpeechRecognition
-pip install PyAudio
-pip install RPi.GPIO
+# Install core libraries from your requirements file
+pip install -r requirements.txt
 `,
   },
   {
-    id: 2,
+    id: 3,
     title: 'Wake Word Detection: "Hey Saras"',
     icon: MicIcon,
-    description: `The robot needs to listen for its wake word. We'll create a simple loop using the SpeechRecognition library to continuously listen to the microphone in the background. When "Hey Saras" is detected, it will trigger the command listening mode.`,
+    description: `The robot needs to listen for its wake word. We'll create a simple loop using the SpeechRecognition library to continuously listen to the microphone in the background. When "Hey Saras" is detected, it will trigger the command listening mode. This code would go in 'core/wake_word.py'.`,
     code: `
 import speech_recognition as sr
 
@@ -60,10 +98,10 @@ def listen_for_wake_word():
 `,
   },
     {
-    id: 3,
+    id: 4,
     title: 'RGB Light Indication',
     icon: LightIcon,
-    description: `To provide visual feedback, the robot's RGB lights will animate when it hears the wake word. We'll use the RPi.GPIO library to control the LEDs and cycle through Google-like colors (blue, red, yellow, green) for a few seconds.`,
+    description: `To provide visual feedback, the robot's RGB lights will animate when it hears the wake word. We'll use the RPi.GPIO library to control the LEDs and cycle through Google-like colors (blue, red, yellow, green) for a few seconds. This code belongs in 'core/led_control.py'.`,
     code: `
 import RPi.GPIO as GPIO
 import time
@@ -91,17 +129,17 @@ def google_light_animation():
 `,
   },
   {
-    id: 4,
+    id: 5,
     title: 'Gemini API Integration',
     icon: BrainIcon,
-    description: `This is the core of the robot's intelligence. We'll integrate the Google Gemini API to process commands, describe scenes, and generate responses. Remember to set your API key as an environment variable for security.`,
+    description: `This is the core of the robot's intelligence. We'll integrate the Google Gemini API to process commands, describe scenes, and generate responses. Remember to set your API key in the .env file. This code goes in 'core/gemini_ai.py'.`,
     code: `
 import os
 from google.generativeai import GoogleGenAI
 import base64
 
-# IMPORTANT: Set your API key in your environment
-# export API_KEY="YOUR_GEMINI_API_KEY"
+# IMPORTANT: Your API key should be in a .env file
+# and loaded securely, e.g., using python-dotenv library.
 
 ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
 
@@ -129,14 +167,14 @@ async def get_gemini_response(prompt_text, image_path=None):
 `,
   },
   {
-    id: 5,
+    id: 6,
     title: 'Vision: See and Describe',
     icon: VisionIcon,
-    description: `Using the camera and Gemini's vision capabilities, Saras can describe its surroundings. A function will capture an image, send it to the Gemini API with a prompt like "Describe what you see in detail," and then speak the response using a text-to-speech engine.`,
+    description: `Using the camera and Gemini's vision capabilities, Saras can describe its surroundings. A function will capture an image, send it to the Gemini API with a prompt like "Describe what you see in detail," and then speak the response. This logic belongs in 'core/vision.py'.`,
     code: `
 import cv2
-from gtts import gTTS
-import os
+# from utils.text_to_speech import speak
+# from core.gemini_ai import get_gemini_response
 
 def see_and_describe():
     # Capture image from camera
@@ -150,17 +188,17 @@ def see_and_describe():
     description = get_gemini_response("Describe this scene for me.", "capture.jpg")
     
     # Convert text to speech and play
-    tts = gTTS(text=description, lang='en')
-    tts.save("response.mp3")
-    os.system("mpg321 response.mp3")
+    speak(description)
 `,
   },
     {
-    id: 6,
+    id: 7,
     title: 'Intelligent Actions & Custom Responses',
     icon: RobotIcon,
-    description: `Combine all features into a main control loop. This function will parse the user's command after the wake word is detected and trigger the appropriate action, from object detection to custom Gujarati greetings. We'll use a set to track seen faces/dogs to ensure "Namaste" is said only once.`,
+    description: `Combine all features into a main control loop in 'main.py'. This function will parse the user's command after the wake word is detected and trigger the appropriate action, from object detection to custom Gujarati greetings. We'll use a set to track seen faces/dogs to ensure "Namaste" is said only once.`,
     code: `
+# This code would be part of your main.py
+
 seen_entities = set()
 
 def handle_command(command):
@@ -168,7 +206,7 @@ def handle_command(command):
     
     if "introduce yourself" in command:
         response_text = "હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે."
-        # Speak this text...
+        speak(response_text)
     
     elif "what do you see" in command:
         see_and_describe()
@@ -183,7 +221,7 @@ def handle_command(command):
 
     else: # Default to Gemini for general questions
         response = get_gemini_response(command)
-        # Speak the response...
+        speak(response)
 
 def detect_and_greet():
     # In a background thread, run object detection
@@ -191,8 +229,47 @@ def detect_and_greet():
     entity_id = "person_1" # Get a unique ID for the detected entity
     if entity_id not in seen_entities:
         greeting = "નમસ્તે"
-        # Speak the greeting...
+        speak(greeting)
         seen_entities.add(entity_id)
+`,
+  },
+  {
+    id: 8,
+    title: 'Mathematical Problem Solving',
+    icon: CalculatorIcon,
+    description: `To make Saras a helpful school assistant, we can give it the ability to solve mathematical sums. The robot will listen for phrases like "calculate" or "what is" followed by a math expression.
+
+We'll use a regular expression to find and extract the mathematical part of the command (e.g., "5 * (10 + 2)"). Then, for simplicity, we use Python's built-in 'eval()' function to compute the result.
+
+**Important Note:** Using 'eval()' can be a security risk if the input isn't controlled. For a school project this is acceptable, but for a production system, a safer math parsing library like 'asteval' is recommended.`,
+    code: `
+# Add this logic inside your handle_command(command) function in main.py
+import re
+
+# ... inside handle_command function
+
+elif "calculate" in command or "what is" in command or "solve" in command:
+    # Use regex to find a mathematical expression
+    math_expression = re.search(r'[\\d\\s\\+\\-\\*\\/\\(\\)]+$', command)
+    
+    if math_expression:
+        expression = math_expression.group(0).strip()
+        try:
+            # IMPORTANT: eval() can be risky. Use with trusted input.
+            result = eval(expression)
+            response_text = f"The answer is {result}."
+            print(f"Solved: {expression} = {result}")
+            speak(response_text)
+        except Exception as e:
+            print(f"Could not solve the math problem: {e}")
+            speak("I'm sorry, I couldn't understand that math problem.")
+    else:
+        speak("I didn't find a math problem to solve in your command.")
+
+# Example commands this would handle:
+# "Hey Saras, what is 15 plus 27"
+# "Hey Saras, calculate 100 divided by 4"
+# "Hey Saras, solve 5 * (2 + 8)"
 `,
   },
 ];

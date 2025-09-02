@@ -1,6 +1,6 @@
 # Saras AI Robot: The Ultimate RASPBOT V2 Upgrade
 
-This repository contains the source code for a web-based, step-by-step guide to transform the [Yahboom RASPBOT V2](https://www.yahboom.net/study/RASPBOT-V2) into an intelligent, interactive AI assistant named "Saras". This project integrates the power of Google's Gemini API to give the robot advanced capabilities, from understanding its surroundings to responding in multiple languages.
+This repository contains the source code for a web-based, step-by-step guide to transform the [Yahboom RASPBOT V2](https://www.yahboom.net/study/RASPBOT-V2) into an intelligent, interactive AI assistant named "Saras". This project integrates the power of Google's Gemini API to give the robot advanced capabilities, from understanding its surroundings to responding in multiple languages. As a helpful assistant for its school environment, it can also solve mathematical problems.
 
 This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 
@@ -18,6 +18,7 @@ The guide walks you through implementing the following features:
 -   👁️ **AI Vision**: Saras can capture images, analyze them using Gemini, and describe what it sees out loud.
 -   📚 **Object Detection & Interaction**: Can perform tasks like identifying and finding a book.
 -   🚗 **Autonomous Behavior**: Capable of advanced actions like following a specific object (e.g., a car) and avoiding obstacles.
+-   ➕ **Mathematical Capabilities**: Can solve arithmetic sums spoken in natural language.
 -   💬 **Custom Personality & Multilingual Responses**:
     -   Delivers a pre-defined introduction in **Gujarati**.
     -   Greets new faces (humans or dogs) with a polite **"Namaste"** in Gujarati on the first encounter.

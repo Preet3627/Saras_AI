@@ -1,6 +1,6 @@
 # Saras AI Robot: Web Control Panel & Guide
 
-This repository contains the source code for a web-based **control panel and setup guide** to transform the [Yahboom RASPBOT V2](https://www.yahboom.net/study/RASPBOT-V2) into an intelligent, interactive AI assistant named "Saras".
+This repository contains the source code for a web-based **control panel and setup guide** to transform the [Yahboom RASPBOT V2](https://www.yahboom.net/study/RASPBOT-V2) into an intelligent, interactive AI assistant named "Saras". This project is fully compatible with the **RASPBOT V2 Superior kit**.
 
 This project has evolved into a client-server architecture. The web application in this repository is the **frontend (the client)**, which you run in your browser. It communicates with a **Python web server (the backend)** that you will build and run on the robot itself.
 
@@ -17,13 +17,14 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 
 -   🌐 **Web-Based Control**: Operate your robot from any device with a web browser on the same network.
 -   📹 **Live Camera Streaming**: View a real-time video feed from the robot's camera directly in the control panel.
+-   🔊 **Dual Response System**: The robot provides feedback by **speaking out loud** and simultaneously sending a log message to the **web UI**.
 -   🤖 **Advanced Autopilot System**:
     -   🧭 **Explore Mode**: An autonomous mode where the robot will randomly wander around its environment.
     -   🚦 **Traffic Mode**: Activate a mode where the robot recognizes and responds to traffic lights and stop signs.
     -   🚗 **Follow Car Mode**: Command the robot to detect and follow a specific object, like a toy car.
     -   🛡️ **Obstacle Avoidance**: A basic self-driving mode that uses the ultrasonic sensor to navigate and avoid obstacles.
 -   🧠 **AI-Powered Vision & Actions**:
-    -   🎤 **Customizable Voice Wake Word**: Set a custom wake-up phrase (e.g., "Hey Saras") from the web UI. The robot will listen for this phrase to activate.
+    -   🎤 **Customizable Voice Wake Word**: Set a custom wake-up phrase (e.g., "Hey Saras") from the web UI. The robot will listen for this phrase using its microphone to activate.
     -   ✍️ **Editable Custom Responses**: Teach Saras custom replies to your own questions directly from the web UI.
     -   ✨ **Wake Word Effect**: A Google Assistant-style RGB light animation can be triggered to show the robot is 'listening'.
     -   **Object Detection**: The robot can identify multiple objects, people, and animals in its environment.
@@ -45,6 +46,17 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 1.  **Frontend**: Open the `index.html` file in your browser. This is your control panel.
 2.  **Backend**: Follow the "Setup Guide" steps displayed in the web application. You can download the complete code bundle using the download button in the header.
 3.  **Connect**: Once the Python server is running on the robot, enter the robot's IP address into the control panel and click "Connect". You can now control your Saras AI Robot!
+
+### Install Yahboom Drivers (Crucial Step)
+The `yahboom-robot-hat` library requires drivers to communicate with the hardware. Run the following commands on your Raspberry Pi to install them before running the main server.
+
+```bash
+# Clone the official Yahboom repository
+git clone https://github.com/yahboomtechnology/Raspbot.git
+# Run the installation script
+sudo ./Raspbot/Raspbot/install.sh
+```
+This will install the necessary dependencies and configure the hardware interface. A reboot is recommended after installation.
 
 ### Backend Dependencies
 Before running the backend server, you may need to install a system-level library for microphone access on your Raspberry Pi:

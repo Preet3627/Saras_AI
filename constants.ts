@@ -50,20 +50,25 @@ export const STEPS: Step[] = [
     id: 2,
     title: 'Hardware & Environment Setup',
     icon: HardwareIcon,
-    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. You will also need to download pre-trained object detection model files (like YOLOv3-tiny) and place them in the 'models' directory. For the new wake word feature, you'll need a USB microphone connected to the Pi and must install a system dependency for it.`,
+    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Yahboom drivers and Python libraries. You will also need a USB microphone connected to the Pi and must download the pre-trained object detection model files.`,
     code: `
 # Open a terminal on your Raspberry Pi and run these commands:
-# Install system dependency for microphone audio
+# 1. Install Yahboom Robot HAT Drivers (CRUCIAL)
+git clone https://github.com/yahboomtechnology/Raspbot.git
+sudo ./Raspbot/Raspbot/install.sh
+# A reboot may be required after installation.
+
+# 2. Install system dependency for microphone audio
 sudo apt-get update && sudo apt-get install -y portaudio19-dev
 
-# Create and activate a virtual environment
+# 3. Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
-# Install core libraries from your requirements file
+# 4. Install core Python libraries
 pip install -r requirements.txt
 
-# Download YOLOv3-tiny model files (example)
+# 5. Download YOLOv3-tiny model files
 wget -P ./models https://pjreddie.com/media/files/yolov3-tiny.weights
 wget -P ./models https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
 `,

@@ -231,7 +231,7 @@ def index():
 def handle_command():
     data = request.json
     command = data.get('command')
-    text = data.get('text') # Optional text payload
+    text = data.get('text') # Optional text payload for custom questions
     print(f"Received command: {command}")
 
     # Check for custom responses first
@@ -240,16 +240,35 @@ def handle_command():
         text_to_speech.speak(response_text)
         return jsonify(status="success", message=response_text)
 
-    # Manual Movement
-    if command == 'move_forward': motor_control.move_forward()
-    elif command == 'move_backward': motor_control.move_backward()
-    elif command == 'strafe_left': motor_control.strafe_left()
-    elif command == 'strafe_right': motor_control.strafe_right()
-    elif command == 'rotate_left': motor_control.rotate_left()
-    elif command == 'rotate_right': motor_control.rotate_right()
-    elif command == 'stop': motor_control.stop()
+    # Movement Commands
+    if command == 'move_forward': 
+        motor_control.move_forward()
+        return jsonify(status="success", message="Moving forward.")
+    elif command == 'move_backward': 
+        motor_control.move_backward()
+        return jsonify(status="success", message="Moving backward.")
+    elif command == 'strafe_left': 
+        motor_control.strafe_left()
+        return jsonify(status="success", message="Strafing left.")
+    elif command == 'strafe_right': 
+        motor_control.strafe_right()
+        return jsonify(status="success", message="Strafing right.")
+    elif command == 'rotate_left': 
+        motor_control.rotate_left()
+        return jsonify(status="success", message="Rotating left.")
+    elif command == 'rotate_right': 
+        motor_control.rotate_right()
+        return jsonify(status="success", message="Rotating right.")
+    elif command == 'stop': 
+        motor_control.stop()
+        return jsonify(status="success", message="Stopping all movement.")
     
-    # AI and other commands
+    # Sensor and AI Commands
+    elif command == 'measure_distance':
+        distance = ultrasonic.get_distance()
+        response = f"Distance: {distance:.1f} cm." if distance else "Could not measure distance."
+        return jsonify(status="success", message=response)
+
     elif command == 'wake_word':
         led_control.assistant_wakeup_animation()
         return jsonify(status="success", message="Listening...")
@@ -271,8 +290,14 @@ def handle_command():
         description = vision.see_and_describe(camera)
         text_to_speech.speak(description)
         return jsonify(status="success", message=description)
+
+    elif command == 'scan_question':
+        # Placeholder for scanning a question with the camera
+        response = "Scanning question... The capital of France is Paris."
+        text_to_speech.speak(response)
+        return jsonify(status="success", message=response)
         
-    return jsonify(status="success", command=command)
+    return jsonify(status="error", message=f"Unknown command: {command}")
 
 
 @app.route('/autopilot', methods=['POST'])
@@ -284,8 +309,9 @@ def handle_autopilot():
         STATE["autopilot_mode"] = mode
         if mode == 'off':
             motor_control.stop()
-        print(f"Autopilot mode set to: {mode}")
-        return jsonify(status="success", message=f"Autopilot mode set to {mode}.")
+        message = f"Autopilot engaged: {mode.capitalize()} mode." if mode != "off" else "All autopilot systems deactivated."
+        print(message)
+        return jsonify(status="success", message=message)
     
     return jsonify(status="error", message="Invalid mode.")
 
@@ -295,7 +321,7 @@ def handle_custom_responses():
     # Convert list of dicts to a single dict for fast lookups
     STATE["custom_responses"] = {item['question']: item['answer'] for item in data}
     print(f"Updated custom responses. Total: {len(STATE['custom_responses'])}")
-    return jsonify(status="success", message="Custom responses updated.")
+    return jsonify(status="success", message="Custom responses updated successfully.")
 
 
 @app.route('/set-wake-word', methods=['POST'])
@@ -357,6 +383,7 @@ if __name__ == '__main__':
         wake_word_thread.start()
         
         print("Starting Flask server...")
+        # Use gunicorn for production, but Flask's development server is fine for this context
         app.run(host='0.0.0.0', port=5001, threaded=True)
         
     finally:

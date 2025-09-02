@@ -18,7 +18,6 @@ const App: React.FC = () => {
   const [autopilotMode, setAutopilotMode] = useState<AutopilotMode>('off');
   const [isStreamLoading, setIsStreamLoading] = useState<boolean>(true);
   
-  // State for custom responses
   const [customResponses, setCustomResponses] = useState<CustomResponse[]>([
     { id: 1, question: "Who are you?", answer: "I am Saras, an AI Robot." },
     { id: 2, question: "What can you do?", answer: "I can see, move, talk, and learn new things!" }
@@ -26,9 +25,7 @@ const App: React.FC = () => {
   const [newQuestion, setNewQuestion] = useState<string>('');
   const [newAnswer, setNewAnswer] = useState<string>('');
   
-  // State for wake word
   const [wakeWord, setWakeWord] = useState<string>('hey saras');
-
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const connectSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -65,11 +62,34 @@ const App: React.FC = () => {
     setLogs(prevLogs => [...prevLogs, newLog]);
   };
   
-  const handleAction = (command: string, response: string, text?: string) => {
-    addLog('System', 'command', command);
-    // Here you would typically send the command to the robot's API
-    // For this simulation, we just add a delayed response.
-    setTimeout(() => addLog('Robot', 'response', response), 500);
+  const sendRobotRequest = async (endpoint: string, method: string, body: object | null, systemLog: string) => {
+    if (!isConnected) {
+        addLog('System', 'error', 'Not connected to the robot.');
+        return;
+    }
+    addLog('System', 'command', systemLog);
+    try {
+        const response = await fetch(`http://${robotIp}:5001${endpoint}`, {
+            method: method,
+            headers: { 'Content-Type': 'application/json' },
+            body: body ? JSON.stringify(body) : null,
+        });
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.message) {
+            addLog('Robot', 'response', data.message);
+        }
+        return data;
+    } catch (error) {
+        console.error("API request failed:", error);
+        addLog('System', 'error', `Request failed. Is the robot server running at ${robotIp}?`);
+    }
+  };
+
+  const handleCommand = (command: string, text?: string) => {
+      sendRobotRequest('/command', 'POST', { command, text }, `Sending command: ${command}`);
   };
 
   const handleSetWakeUpWord = () => {
@@ -77,11 +97,7 @@ const App: React.FC = () => {
       addLog('System', 'error', 'Wake word cannot be empty.');
       return;
     }
-    addLog('System', 'command', `Setting wake word to "${wakeWord}"...`);
-    // Mock API call
-    setTimeout(() => {
-        addLog('Robot', 'response', 'Wake word updated successfully.');
-    }, 500);
+    sendRobotRequest('/set-wake-word', 'POST', { wake_word: wakeWord }, `Setting wake word to "${wakeWord}"...`);
   };
 
   const handleAddResponse = () => {
@@ -102,60 +118,22 @@ const App: React.FC = () => {
   };
   
   const handleSaveResponsesToRobot = () => {
-    addLog('System', 'command', 'Saving all custom responses to robot...');
-    // In a real app, this would be an API call:
-    // fetch(`http://${robotIp}:5001/custom-responses`, { 
-    //   method: 'POST', 
-    //   headers: {'Content-Type': 'application/json'},
-    //   body: JSON.stringify({ responses: customResponses })
-    // });
-    setTimeout(() => {
-        addLog('Robot', 'response', 'Custom responses updated successfully.');
-    }, 500);
+    sendRobotRequest('/custom-responses', 'POST', { responses: customResponses }, 'Saving all custom responses to robot...');
   };
   
   const handleTestResponse = (question: string, answer: string) => {
     addLog('System', 'command', `Testing custom response for: "${question}"`);
-    setTimeout(() => {
-        addLog('Robot', 'response', answer);
-    }, 500);
+    // This is a special command to make the robot speak the answer
+    sendRobotRequest('/command', 'POST', { command: 'test_custom_response', text: question }, `Asking robot: "${question}"`);
   };
 
-  
-  const handleToggleAutopilot = (mode: AutopilotMode) => {
+  const handleToggleAutopilot = async (mode: AutopilotMode) => {
     const nextMode = autopilotMode === mode ? 'off' : mode;
-    setAutopilotMode(nextMode);
-
-    let command = '';
-    let response = '';
-
-    if (nextMode === 'off') {
-        command = 'Deactivate Autopilot';
-        response = 'All autopilot systems deactivated.';
-    } else {
-        switch(nextMode) {
-            case 'avoid':
-                command = 'Activate Obstacle Avoidance';
-                response = 'Autopilot engaged: Obstacle Avoidance mode.';
-                break;
-            case 'traffic':
-                command = 'Activate Traffic Mode';
-                response = 'Autopilot engaged: Traffic Sign Recognition mode.';
-                break;
-            case 'follow':
-                command = 'Activate Follow Car Mode';
-                response = 'Autopilot engaged: Following designated car.';
-                break;
-            case 'explore':
-                command = 'Activate Explore Mode';
-                response = 'Autopilot engaged: Exploring surroundings randomly.';
-                break;
-        }
+    const data = await sendRobotRequest('/autopilot', 'POST', { mode: nextMode }, `Setting autopilot to ${nextMode}...`);
+    if (data && data.status === 'success') {
+      setAutopilotMode(nextMode);
     }
-    
-    handleAction(command, response);
   };
-
 
   const handleDownloadCode = () => {
     const zip = new JSZip();
@@ -187,6 +165,7 @@ const App: React.FC = () => {
     } else if (!isConnecting) {
       setIsConnecting(true);
       addLog('System', 'info', `Connecting to robot at ${robotIp}...`);
+      // Simulate connection delay
       setTimeout(() => {
         setIsConnected(true);
         setIsStreamLoading(true);
@@ -366,16 +345,16 @@ const App: React.FC = () => {
               <h3 className="text-lg font-semibold text-white mb-4">Movement & Sensors</h3>
               <div className="grid grid-cols-3 sm:grid-cols-4 gap-4">
                 <div className="col-span-3 sm:col-span-3 grid grid-cols-3 gap-2">
-                   <button onClick={() => handleAction('Rotate Left', 'Rotating left.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Rotate Left"><ArrowUturnLeftIcon className="h-6 w-6" /></button>
-                  <button onClick={() => handleAction('Move Forward', 'Moving forward.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Move Forward"><ArrowUpIcon className="h-6 w-6" /></button>
-                  <button onClick={() => handleAction('Rotate Right', 'Rotating right.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Rotate Right"><ArrowUturnRightIcon className="h-6 w-6" /></button>
-                  <button onClick={() => handleAction('Strafe Left', 'Strafing left.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Strafe Left"><ArrowLeftIcon className="h-6 w-6" /></button>
-                  <button onClick={() => handleAction('Stop', 'Stopping all movement.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-red-600/80 rounded-md hover:bg-red-500/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Stop"><StopIcon className="h-6 w-6" /></button>
-                  <button onClick={() => handleAction('Strafe Right', 'Strafing right.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Strafe Right"><ArrowRightIcon className="h-6 w-6" /></button>
-                  <div/><button onClick={() => handleAction('Move Backward', 'Moving backward.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Move Backward"><ArrowDownIcon className="h-6 w-6" /></button><div/>
+                   <button onClick={() => handleCommand('rotate_left')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Rotate Left"><ArrowUturnLeftIcon className="h-6 w-6" /></button>
+                  <button onClick={() => handleCommand('move_forward')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Move Forward"><ArrowUpIcon className="h-6 w-6" /></button>
+                  <button onClick={() => handleCommand('rotate_right')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Rotate Right"><ArrowUturnRightIcon className="h-6 w-6" /></button>
+                  <button onClick={() => handleCommand('strafe_left')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Strafe Left"><ArrowLeftIcon className="h-6 w-6" /></button>
+                  <button onClick={() => handleCommand('stop')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-red-600/80 rounded-md hover:bg-red-500/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Stop"><StopIcon className="h-6 w-6" /></button>
+                  <button onClick={() => handleCommand('strafe_right')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Strafe Right"><ArrowRightIcon className="h-6 w-6" /></button>
+                  <div/><button onClick={() => handleCommand('move_backward')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors" aria-label="Move Backward"><ArrowDownIcon className="h-6 w-6" /></button><div/>
                 </div>
                 <div className="col-span-3 sm:col-span-1 flex flex-col gap-4">
-                   <button onClick={() => handleAction('Measure Distance', `Obstacle detected at ${Math.floor(Math.random() * 100) + 10} cm.`)} disabled={!isConnected} className="flex items-center text-center justify-center w-full h-full p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                   <button onClick={() => handleCommand('measure_distance')} disabled={!isConnected} className="flex items-center text-center justify-center w-full h-full p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                      <BeakerIcon className="h-5 w-5 mr-2" />Measure Distance</button>
                 </div>
               </div>
@@ -384,13 +363,13 @@ const App: React.FC = () => {
              <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4">AI Actions</h3>
               <div className="grid grid-cols-2 gap-4">
-                 <button onClick={() => handleAction('Describe Scene', 'I see a desk with a computer and a window.')} disabled={!isConnected} className="col-span-2 flex items-center justify-center p-3 bg-gray-700/50 rounded-md hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors animate-rgb-border-glow font-semibold text-lg">
+                 <button onClick={() => handleCommand('describe_scene')} disabled={!isConnected} className="col-span-2 flex items-center justify-center p-3 bg-gray-700/50 rounded-md hover:bg-gray-600/50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors animate-rgb-border-glow font-semibold text-lg">
                     <CameraIcon className="h-6 w-6 mr-3" />See & Describe Scene
                  </button>
-                 <button onClick={() => handleAction('wake_word', 'Listening...')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SparklesIcon className="h-5 w-5 mr-2" />Test Wake Effect</button>
-                 <button onClick={() => handleAction('Introduce Yourself (Gujarati)', 'હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><RobotIcon className="h-5 w-5 mr-2" />Introduce (Gujarati)</button>
-                 <button onClick={() => handleAction('Find a Book', 'Searching for a book... Found one!')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><FindBookIcon className="h-5 w-5 mr-2" />Find a Book</button>
-                <button onClick={() => handleAction('Scan Question', 'The question is "What is the capital of France?". The answer is Paris.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ScanIcon className="h-5 w-5 mr-2" />Scan Question</button>
+                 <button onClick={() => handleCommand('wake_word')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SparklesIcon className="h-5 w-5 mr-2" />Test Wake Effect</button>
+                 <button onClick={() => handleCommand('introduce_gujarati')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><RobotIcon className="h-5 w-5 mr-2" />Introduce (Gujarati)</button>
+                 <button onClick={() => handleCommand('find_book')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><FindBookIcon className="h-5 w-5 mr-2" />Find a Book</button>
+                <button onClick={() => handleCommand('scan_question')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ScanIcon className="h-5 w-5 mr-2" />Scan Question</button>
               </div>
             </div>
 

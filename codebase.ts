@@ -65,74 +65,157 @@ venv.bak/
 # IDE files
 .idea/
 .vscode/
+models/
 `,
   'requirements.txt': `Flask
 Flask-Cors
 google-generativeai
 python-dotenv
 yahboom-robot-hat
-opencv-python
+opencv-python-headless
+numpy
 gunicorn
+RPi.GPIO
 `,
   'main.py': `import os
 import threading
 import time
+import random
 from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from dotenv import load_dotenv
 
 from core import motor_control, vision, ultrasonic, ir_remote, led_control
 from core.camera import Camera
+from core.object_detector import ObjectDetector
 from utils import text_to_speech
 
-# Load environment variables
+# --- Load Environment and Initialize ---
 load_dotenv()
+led_control.setup_leds()
+led_control.google_light_animation()
 
-# Initialize Robot Hardware
-try:
-    led_control.setup_leds()
-    led_control.google_light_animation()
-except Exception as e:
-    print(f"Could not initialize LEDs: {e}")
+# --- Global State Management ---
+# Using a dictionary for thread-safe-like access to global state
+STATE = {
+    "latest_detections": [],
+    "autopilot_mode": "off", # 'off', 'avoid', 'traffic', 'follow', 'explore'
+    "seen_entities": set(),
+    "is_running": True
+}
 
-# --- Autonomous Mode State ---
-AVOIDANCE_ENABLED = False
-AVOIDANCE_THREAD = None
-
-# --- Flask App Initialization ---
+# --- Initialization ---
 app = Flask(__name__)
-CORS(app) # Allow requests from the web browser UI
+CORS(app)
+camera = Camera().start()
+detector = ObjectDetector()
 
-# --- Camera Initialization ---
-# Use two separate camera instances for streaming and captures to avoid conflicts
-stream_camera = Camera()
 
 # --- Background Threads ---
-def start_ir_listener():
-    print("Starting IR remote listener...")
-    ir_thread = threading.Thread(target=ir_remote.ir_control_loop, daemon=True)
-    ir_thread.start()
 
-# --- Autonomous Driving Logic ---
-def obstacle_avoidance_loop():
-    """Continuously drive forward and turn to avoid obstacles."""
-    global AVOIDANCE_ENABLED
-    print("Starting obstacle avoidance loop.")
-    while AVOIDANCE_ENABLED:
-        distance = ultrasonic.get_distance()
-        if distance is not None and distance > 25:
-            motor_control.move_forward(speed=40)
-        else:
-            print(f"Obstacle detected at {distance} cm. Turning.")
-            motor_control.stop()
+def detection_loop():
+    """Continuously runs object detection and handles proactive behaviors."""
+    print("Starting object detection loop...")
+    while STATE["is_running"]:
+        frame = camera.read_frame()
+        if frame is None:
             time.sleep(0.1)
-            motor_control.rotate_left(speed=50)
-            time.sleep(0.5) # Turn for half a second
-            motor_control.stop()
-        time.sleep(0.1) # Loop delay
-    motor_control.stop()
-    print("Obstacle avoidance loop stopped.")
+            continue
+        
+        detections = detector.detect(frame)
+        STATE["latest_detections"] = detections
+        
+        # Proactive Greeting Logic
+        for d in detections:
+            if d['label'] in ['person', 'dog']:
+                # Create a simple unique ID based on class and rough position
+                entity_id = f"{d['label']}_{round(d['box'][0] / 50)}"
+                if entity_id not in STATE["seen_entities"]:
+                    print(f"New entity detected: {entity_id}. Greeting.")
+                    text_to_speech.speak("નમસ્તે", lang="gu")
+                    STATE["seen_entities"].add(entity_id)
+                    # Optional: Add a timer to clear the seen_entities set
+        
+        time.sleep(0.1) # Limit loop frequency
+    print("Detection loop stopped.")
 
+def autopilot_loop():
+    """Runs autopilot logic based on current mode and detections."""
+    print("Starting autopilot loop...")
+    while STATE["is_running"]:
+        mode = STATE["autopilot_mode"]
+        detections = STATE["latest_detections"]
+        
+        if mode == "off":
+            time.sleep(0.5) # Don't spin CPU when idle
+            continue
+        
+        # Priority 1: Safety - Avoid harmful creatures
+        if any(d['label'] == 'snake' for d in detections): # Assuming 'snake' is a class in your model
+            print("Harmful creature detected! Reversing.")
+            motor_control.move_backward(speed=70)
+            time.sleep(1.5)
+            motor_control.stop()
+            STATE["autopilot_mode"] = "off" # Disable autopilot for safety
+            continue
+
+        # Mode-specific logic
+        if mode == 'avoid':
+            distance = ultrasonic.get_distance()
+            if distance is not None and distance > 25:
+                motor_control.move_forward(speed=40)
+            else:
+                motor_control.stop()
+                time.sleep(0.1)
+                motor_control.rotate_left(speed=50)
+                time.sleep(0.5)
+                motor_control.stop()
+        
+        elif mode == 'traffic':
+            is_stop_sign = any(d['label'] == 'stop sign' for d in detections)
+            # Add logic for traffic lights if your model supports it
+            if is_stop_sign:
+                motor_control.stop()
+            else:
+                motor_control.move_forward(speed=35)
+                
+        elif mode == 'follow':
+            cars = [d for d in detections if d['label'] == 'car']
+            if cars:
+                # Get the largest car detected
+                target = max(cars, key=lambda x: x['box'][2] * x['box'][3])
+                box = target['box']
+                # Simple proportional controller to keep the car centered
+                center_x = box[0] + box[2] / 2
+                error = 320 - center_x # Assuming 640x480 resolution
+                
+                # Adjust rotation based on error
+                turn_speed = int(error * 0.2)
+                # Clamp speed
+                turn_speed = max(-40, min(40, turn_speed))
+                motor_control.rotate_right(speed=turn_speed)
+
+            else:
+                motor_control.stop()
+        
+        elif mode == 'explore':
+            # Simple random movement: move forward, turn, repeat.
+            print("Exploring...")
+            motor_control.move_forward(speed=35)
+            time.sleep(random.uniform(1.0, 2.5))
+            
+            turn_function = random.choice([motor_control.rotate_left, motor_control.rotate_right])
+            turn_speed = random.randint(40, 60)
+            turn_duration = random.uniform(0.5, 1.5)
+            
+            print(f"Turning for {turn_duration:.2f}s")
+            turn_function(speed=turn_speed)
+            time.sleep(turn_duration)
+            motor_control.stop()
+            time.sleep(1.0) # Pause before next move
+
+        time.sleep(0.1)
+    print("Autopilot loop stopped.")
 
 # --- API Endpoints ---
 @app.route('/')
@@ -145,7 +228,7 @@ def handle_command():
     command = data.get('command')
     print(f"Received command: {command}")
 
-    # Movement Commands
+    # Manual Movement
     if command == 'move_forward': motor_control.move_forward()
     elif command == 'move_backward': motor_control.move_backward()
     elif command == 'strafe_left': motor_control.strafe_left()
@@ -154,52 +237,93 @@ def handle_command():
     elif command == 'rotate_right': motor_control.rotate_right()
     elif command == 'stop': motor_control.stop()
     
-    # Sensor Commands
-    elif command == 'measure_distance':
-        distance = ultrasonic.get_distance()
-        return jsonify(status="success", message=f"Distance: {distance:.2f} cm")
+    # AI and other commands
+    elif command == 'wake_word':
+        led_control.assistant_wakeup_animation()
+        return jsonify(status="success", message="Listening...")
+
+    elif command == 'introduce_gujarati':
+        intro_text = "હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે."
+        text_to_speech.speak(intro_text, lang="gu")
+        return jsonify(status="success", message=intro_text)
+    
+    elif command == 'find_book':
+        if any(d['label'] == 'book' for d in STATE["latest_detections"]):
+            response = "I see a book!"
+        else:
+            response = "I am looking, but I don't see a book right now."
+        text_to_speech.speak(response)
+        return jsonify(status="success", message=response)
         
-    # AI Commands
     elif command == 'describe_scene':
-        # This should run in a thread to avoid blocking
-        description = vision.see_and_describe()
+        description = vision.see_and_describe(camera)
         text_to_speech.speak(description)
         return jsonify(status="success", message=description)
-
+        
     return jsonify(status="success", command=command)
 
-@app.route('/autonomous', methods=['POST'])
-def handle_autonomous():
-    global AVOIDANCE_ENABLED, AVOIDANCE_THREAD
-    data = request.json
-    mode = data.get('mode') # "start" or "stop"
 
-    if mode == 'start' and not AVOIDANCE_ENABLED:
-        AVOIDANCE_ENABLED = True
-        AVOIDANCE_THREAD = threading.Thread(target=obstacle_avoidance_loop, daemon=True)
-        AVOIDANCE_THREAD.start()
-        return jsonify(status="success", message="Obstacle avoidance started.")
-    elif mode == 'stop' and AVOIDANCE_ENABLED:
-        AVOIDANCE_ENABLED = False
-        if AVOIDANCE_THREAD:
-            AVOIDANCE_THREAD.join() # Wait for the thread to finish
-        return jsonify(status="success", message="Obstacle avoidance stopped.")
+@app.route('/autopilot', methods=['POST'])
+def handle_autopilot():
+    data = request.json
+    mode = data.get('mode') # 'off', 'avoid', 'traffic', 'follow', 'explore'
     
-    return jsonify(status="ignored", message=f"Mode is already {AVOIDANCE_ENABLED}")
+    if mode in ['off', 'avoid', 'traffic', 'follow', 'explore']:
+        STATE["autopilot_mode"] = mode
+        if mode == 'off':
+            motor_control.stop()
+        print(f"Autopilot mode set to: {mode}")
+        return jsonify(status="success", message=f"Autopilot mode set to {mode}.")
+    
+    return jsonify(status="error", message="Invalid mode.")
 
 
 @app.route('/video_feed')
 def video_feed():
-    """Video streaming route."""
-    return Response(stream_camera.generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+    """Video streaming route that draws detection boxes."""
+    def generate():
+        while STATE["is_running"]:
+            frame = camera.read_frame()
+            if frame is None:
+                continue
+            
+            # Draw latest detections on the frame
+            detections = STATE["latest_detections"]
+            output_frame = detector.draw_boxes(frame, detections)
+
+            (flag, encodedImage) = cv2.imencode(".jpg", output_frame)
+            if not flag:
+                continue
+            
+            yield(b'--frame\\r\\n' b'Content-Type: image/jpeg\\r\\n\\r\\n' + 
+                  bytearray(encodedImage) + b'\\r\\n')
+            time.sleep(0.03)
+
+    return Response(generate(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+def cleanup():
+    print("Shutting down...")
+    STATE["is_running"] = False
+    motor_control.stop()
+    camera.stop()
+    led_control.cleanup()
 
 if __name__ == '__main__':
-    start_ir_listener()
-    print("Starting Flask server...")
-    # Use gunicorn for production or Flask's built-in server for development
-    # Note: The built-in server is not ideal for multi-client streaming
-    app.run(host='0.0.0.0', port=5001, threaded=True)
+    try:
+        # Start background threads
+        detection_thread = threading.Thread(target=detection_loop, daemon=True)
+        autopilot_thread = threading.Thread(target=autopilot_loop, daemon=True)
+        ir_thread = threading.Thread(target=ir_remote.ir_control_loop, daemon=True)
+        
+        detection_thread.start()
+        autopilot_thread.start()
+        ir_thread.start()
+        
+        print("Starting Flask server...")
+        app.run(host='0.0.0.0', port=5001, threaded=True)
+        
+    finally:
+        cleanup()
 `,
   'core/__init__.py': ``,
   'core/camera.py': `import cv2
@@ -207,11 +331,14 @@ import time
 import threading
 
 class Camera:
-    """A thread-safe camera class that handles video capturing."""
-    def __init__(self, src=0):
+    """A thread-safe camera class for continuous video capture."""
+    def __init__(self, src=0, resolution=(640, 480)):
         self.stream = cv2.VideoCapture(src)
         if not self.stream.isOpened():
             raise IOError("Cannot open camera")
+        
+        self.stream.set(cv2.CAP_PROP_FRAME_WIDTH, resolution[0])
+        self.stream.set(cv2.CAP_PROP_FRAME_HEIGHT, resolution[1])
         
         (self.grabbed, self.frame) = self.stream.read()
         self.started = False
@@ -219,11 +346,13 @@ class Camera:
 
     def start(self):
         if self.started:
-            return None
+            print("Camera thread already started.")
+            return self
         self.started = True
         self.thread = threading.Thread(target=self.update, args=())
         self.thread.daemon = True
         self.thread.start()
+        print("Camera thread started.")
         return self
 
     def update(self):
@@ -233,44 +362,30 @@ class Camera:
                 self.grabbed = grabbed
                 self.frame = frame
 
-    def read(self):
+    def read_frame(self):
         with self.read_lock:
+            if self.frame is None:
+                return None
             frame = self.frame.copy()
-            grabbed = self.grabbed
-        return grabbed, frame
+        return frame
 
     def stop(self):
         self.started = False
         if self.thread.is_alive():
             self.thread.join()
-
-    def __exit__(self, exec_type, exc_value, traceback):
         self.stream.release()
+        print("Camera stopped.")
 
-    def capture_frame(self):
-        """Captures a single high-quality frame for tasks like image analysis."""
-        # This could be improved to ensure the latest frame is captured
-        ret, frame = self.stream.read()
-        if ret:
-            cv2.imwrite("capture.jpg", frame)
-            return "capture.jpg"
+    def capture_and_save(self, filename="capture.jpg"):
+        """Captures a single frame and saves it to a file."""
+        frame = self.read_frame()
+        if frame is not None:
+            cv2.imwrite(filename, frame)
+            return filename
         return None
-
-    def generate_frames(self):
-        """Generator function for streaming frames."""
-        while True:
-            # Use a separate read for streaming to avoid interfering with other captures
-            success, frame = self.stream.read()
-            if not success:
-                break
-            else:
-                ret, buffer = cv2.imencode('.jpg', frame)
-                frame = buffer.tobytes()
-                yield (b'--frame\\r\\n'
-                       b'Content-Type: image/jpeg\\r\\n\\r\\n' + frame + b'\\r\\n')
-            time.sleep(0.03) # Limit frame rate to ~30fps
 `,
   'core/gemini_ai.py': `import os
+import asyncio
 from google.generativeai import GoogleGenAI
 import base64
 
@@ -280,7 +395,7 @@ if "API_KEY" not in os.environ:
 
 ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
 
-async def get_gemini_response(prompt_text, image_path=None):
+async def get_gemini_response_async(prompt_text, image_path=None):
     """
     Gets a response from the Gemini API, with an optional image.
     """
@@ -311,6 +426,90 @@ async def get_gemini_response(prompt_text, image_path=None):
     except Exception as e:
         print(f"Error calling Gemini API: {e}")
         return "I'm sorry, I encountered an error trying to process that."
+
+def get_gemini_response(prompt_text, image_path=None):
+    """Synchronous wrapper for the async Gemini call."""
+    return asyncio.run(get_gemini_response_async(prompt_text, image_path))
+`,
+    'core/object_detector.py': `import cv2
+import numpy as np
+import os
+
+class ObjectDetector:
+    """
+    A class to handle object detection using OpenCV's DNN module.
+    """
+    def __init__(self, model_path='models/yolov3-tiny.weights', config_path='models/yolov3-tiny.cfg'):
+        print("Initializing Object Detector...")
+        if not os.path.exists(model_path) or not os.path.exists(config_path):
+            raise FileNotFoundError("YOLO model files not found. Please download them into the 'models' directory.")
+
+        self.net = cv2.dnn.readNet(model_path, config_path)
+        self.layer_names = self.net.getLayerNames()
+        self.output_layers = [self.layer_names[i - 1] for i in self.net.getUnconnectedOutLayers().flatten()]
+        
+        # COCO class labels
+        self.classes = ["person", "bicycle", "car", "motorbike", "aeroplane", "bus", "train", "truck", "boat",
+                        "traffic light", "fire hydrant", "stop sign", "parking meter", "bench", "bird", "cat",
+                        "dog", "horse", "sheep", "cow", "elephant", "bear", "zebra", "giraffe", "backpack",
+                        "umbrella", "handbag", "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball",
+                        "kite", "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket",
+                        "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", "apple",
+                        "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", "donut", "cake", "chair",
+                        "sofa", "pottedplant", "bed", "diningtable", "toilet", "tvmonitor", "laptop", "mouse",
+                        "remote", "keyboard", "cell phone", "microwave", "oven", "toaster", "sink",
+                        "refrigerator", "book", "clock", "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
+        print("Object Detector initialized successfully.")
+
+    def detect(self, frame, confidence_threshold=0.5, nms_threshold=0.4):
+        height, width, _ = frame.shape
+        blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
+        self.net.setInput(blob)
+        layer_outputs = self.net.forward(self.output_layers)
+
+        boxes = []
+        confidences = []
+        class_ids = []
+
+        for output in layer_outputs:
+            for detection in output:
+                scores = detection[5:]
+                class_id = np.argmax(scores)
+                confidence = scores[class_id]
+                if confidence > confidence_threshold:
+                    center_x = int(detection[0] * width)
+                    center_y = int(detection[1] * height)
+                    w = int(detection[2] * width)
+                    h = int(detection[3] * height)
+                    x = int(center_x - w / 2)
+                    y = int(center_y - h / 2)
+                    boxes.append([x, y, w, h])
+                    confidences.append(float(confidence))
+                    class_ids.append(class_id)
+        
+        # Non-Max Suppression
+        indices = cv2.dnn.NMSBoxes(boxes, confidences, confidence_threshold, nms_threshold)
+        
+        detected_objects = []
+        if len(indices) > 0:
+            for i in indices.flatten():
+                box = boxes[i]
+                label = str(self.classes[class_ids[i]])
+                detected_objects.append({"label": label, "box": box, "confidence": confidences[i]})
+        
+        return detected_objects
+
+    def draw_boxes(self, frame, detections):
+        """Draws bounding boxes on the frame."""
+        for detection in detections:
+            x, y, w, h = detection['box']
+            label = detection['label']
+            confidence = detection['confidence']
+            color = (0, 255, 0) # Green
+            cv2.rectangle(frame, (x, y), (x + w, y + h), color, 2)
+            text = f"{label}: {confidence:.2f}"
+            cv2.putText(frame, text, (x, y - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
+        return frame
 `,
   'core/ir_remote.py': `import time
 from yahboom_robot_hat import YahboomRobot
@@ -328,27 +527,16 @@ def ir_control_loop():
             if key is not None:
                 print(f"IR Key Press Detected: {key}")
                 # Map keys to motor functions
-                if key == robot.IR_REMOTE_UP:
-                    motor_control.move_forward()
-                elif key == robot.IR_REMOTE_DOWN:
-                    motor_control.move_backward()
-                elif key == robot.IR_REMOTE_LEFT:
-                    motor_control.rotate_left()
-                elif key == robot.IR_REMOTE_RIGHT:
-                    motor_control.rotate_right()
-                elif key == "C": # Strafe Left (assuming 'C' maps to a key)
-                    motor_control.strafe_left()
-                elif key == "D": # Strafe Right
-                    motor_control.strafe_right()
-                elif key == robot.IR_REMOTE_OK:
-                    motor_control.stop()
+                if key == robot.IR_REMOTE_UP: motor_control.move_forward()
+                elif key == robot.IR_REMOTE_DOWN: motor_control.move_backward()
+                elif key == robot.IR_REMOTE_LEFT: motor_control.rotate_left()
+                elif key == robot.IR_REMOTE_RIGHT: motor_control.rotate_right()
+                elif key == robot.IR_REMOTE_OK: motor_control.stop()
                 
-                # Small delay after command
+                # Small delay after command to prevent double presses
                 time.sleep(0.2)
-
         except Exception as e:
             print(f"Error in IR loop: {e}")
-            # Avoid spamming logs on error
             time.sleep(2)
         
         time.sleep(0.1) # Polling interval
@@ -357,40 +545,100 @@ def ir_control_loop():
 import time
 
 # Define GPIO pins for R, G, B using BCM numbering
-RED_PIN, GREEN_PIN, BLUE_PIN = 17, 27, 22 
+RED_PIN, GREEN_PIN, BLUE_PIN = 17, 27, 22
+PINS = [RED_PIN, GREEN_PIN, BLUE_PIN]
+
+# PWM objects
+red_pwm, green_pwm, blue_pwm = None, None, None
 is_setup = False
 
 def setup_leds():
-    global is_setup
+    """Set up GPIO pins and PWM for the RGB LED."""
+    global is_setup, red_pwm, green_pwm, blue_pwm
+    if is_setup: return
+    
     GPIO.setwarnings(False)
     GPIO.setmode(GPIO.BCM)
-    GPIO.setup([RED_PIN, GREEN_PIN, BLUE_PIN], GPIO.OUT, initial=GPIO.LOW)
+    GPIO.setup(PINS, GPIO.OUT, initial=GPIO.LOW)
+    
+    # Initialize PWM on each pin, 100 Hz frequency
+    red_pwm = GPIO.PWM(RED_PIN, 100)
+    green_pwm = GPIO.PWM(GREEN_PIN, 100)
+    blue_pwm = GPIO.PWM(BLUE_PIN, 100)
+    
+    # Start PWM with 0% duty cycle (off)
+    red_pwm.start(0)
+    green_pwm.start(0)
+    blue_pwm.start(0)
+    
     is_setup = True
-    print("LEDs setup complete.")
+    print("LEDs setup with PWM.")
 
-def set_color(r, g, b):
+def set_color_pwm(r_duty, g_duty, b_duty):
+    """
+    Set LED color using PWM duty cycles (0-100).
+    Assumes a common anode RGB LED, where 100 is OFF and 0 is full brightness.
+    """
     if not is_setup: setup_leds()
-    GPIO.output(RED_PIN, r)
-    GPIO.output(GREEN_PIN, g)
-    GPIO.output(BLUE_PIN, b)
+    if red_pwm: red_pwm.ChangeDutyCycle(100 - r_duty)
+    if green_pwm: green_pwm.ChangeDutyCycle(100 - g_duty)
+    if blue_pwm: blue_pwm.ChangeDutyCycle(100 - b_duty)
 
 def turn_off():
-    set_color(0, 0, 0)
+    set_color_pwm(0, 0, 0)
+
+def cleanup():
+    """Clean up GPIO resources."""
+    print("Cleaning up GPIO for LEDs.")
+    if is_setup:
+        red_pwm.stop()
+        green_pwm.stop()
+        blue_pwm.stop()
+        GPIO.cleanup(PINS)
 
 def google_light_animation():
     """Cycles through Google colors to indicate startup."""
-    if not is_setup: setup_leds()
-    colors = [(0, 0, 1), (1, 0, 0), (1, 1, 0), (0, 1, 0)] # Blue, Red, Yellow, Green
-    for r, g, b in colors:
-        set_color(r, g, b)
+    # RGB values (0-255) converted to duty cycle (0-100)
+    colors_rgb = [
+        (0, 68, 255),    # Blue
+        (255, 0, 0),     # Red
+        (255, 235, 59),  # Yellow
+        (0, 150, 0),     # Green
+    ]
+    for r, g, b in colors_rgb:
+        set_color_pwm(r / 2.55, g / 2.55, b / 2.55)
         time.sleep(0.5)
     turn_off()
     print("Startup animation complete.")
 
-def cleanup():
-    """Clean up GPIO resources."""
-    print("Cleaning up GPIO.")
-    GPIO.cleanup()
+def assistant_wakeup_animation():
+    """Pulses through Google colors like Google Assistant."""
+    if not is_setup: setup_leds()
+    print("Starting Assistant wake-up animation...")
+    
+    # RGB duty cycles for Google colors (0-100)
+    colors = [
+        (0, 26, 100),   # Blue
+        (100, 0, 0),    # Red
+        (100, 92, 23),  # Yellow
+        (0, 59, 0),     # Green
+    ]
+    
+    pulse_duration = 0.25 # Time for one pulse (in and out)
+    
+    for _ in range(2): # Repeat cycle twice
+        for r, g, b in colors:
+            # Fade in
+            for i in range(0, 101, 5):
+                set_color_pwm(r * (i/100.0), g * (i/100.0), b * (i/100.0))
+                time.sleep(pulse_duration / 40)
+            # Fade out
+            for i in range(100, -1, -5):
+                set_color_pwm(r * (i/100.0), g * (i/100.0), b * (i/100.0))
+                time.sleep(pulse_duration / 40)
+    
+    turn_off()
+    print("Assistant animation finished.")
 `,
   'core/motor_control.py': `from yahboom_robot_hat import YahboomRobot
 import atexit
@@ -441,31 +689,22 @@ def get_distance():
     """
     distance = robot.get_distance()
     if distance is not None and distance > 0:
-        # print(f"Distance: {distance:.1f} cm")
         return distance
     else:
-        # print("Failed to get a valid distance reading.")
         return None # Return None for easier error handling
 `,
-  'core/vision.py': `import asyncio
-from core.gemini_ai import get_gemini_response
-from core.camera import Camera
+  'core/vision.py': `from core.gemini_ai import get_gemini_response
 
-# Use a separate camera instance for captures to avoid conflicts with streaming
-capture_camera = Camera()
-
-def see_and_describe():
+def see_and_describe(camera_instance):
     """
-    Captures an image from the camera, sends it to Gemini for description,
-    and returns the textual description.
+    Captures an image, sends it to Gemini for description, and returns the text.
     """
     print("Capturing scene for description...")
-    image_path = capture_camera.capture_frame()
+    image_path = camera_instance.capture_and_save("capture.jpg")
     
     if image_path:
         print(f"Image captured: {image_path}. Getting description from Gemini...")
-        # Run the async function
-        description = asyncio.run(get_gemini_response("Describe this scene in detail.", image_path))
+        description = get_gemini_response("Describe this scene in detail.", image_path)
         print(f"Gemini description: {description}")
         return description
     else:
@@ -475,16 +714,24 @@ def see_and_describe():
   'utils/__init__.py': ``,
   'utils/text_to_speech.py': `import os
 
-def speak(text):
+def speak(text, lang="en"):
     """
     Converts text to speech using the 'espeak' command-line tool.
-    This is a simple, offline method suitable for Raspberry Pi.
+    Supports different languages. For Gujarati, use lang='gu'.
     """
     try:
         # Sanitize text to prevent command injection
         sanitized_text = text.replace('"', '').replace("'", "").replace(";", "")
-        command = f'espeak -v en+f3 -k5 -s150 "{sanitized_text}"'
-        print(f"Speaking: {sanitized_text}")
+        
+        voice_flag = ""
+        if lang == "en":
+            voice_flag = "-v en+f3" # English female voice
+        elif lang == "gu":
+            voice_flag = "-v gu" # Gujarati voice
+            
+        # -k5 adds emphasis, -s150 sets speed
+        command = f'espeak {voice_flag} -k5 -s150 "{sanitized_text}"'
+        print(f"Speaking (lang={lang}): {sanitized_text}")
         os.system(command)
     except Exception as e:
         print(f"Error in text-to-speech: {e}")

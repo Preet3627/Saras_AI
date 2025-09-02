@@ -189,3 +189,58 @@ export const RemoteControlIcon: React.FC<IconProps> = (props) => (
     <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
   </svg>
 );
+
+export const AutopilotIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 12a3 3 0 100-6 3 3 0 000 6z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 15a3 3 0 100 6 3 3 0 000-6z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9a3 3 0 116 0 3 3 0 01-6 0z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9a3 3 0 10-6 0 3 3 0 006 0z" />
+  </svg>
+);
+
+export const TrafficLightIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 6.75V7.5m0 6V12m0 5.25v.75m1.5-6.75h.75m-3.75 0h.75m-1.5 0h.75m6 6.75h.75m-3.75 0h.75m-1.5 0h.75M9 21a9 9 0 100-18 9 9 0 000 18z" />
+  </svg>
+);
+
+export const FollowIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25l7.5 7.5m0 0l-7.5-7.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
+  </svg>
+);
+
+export const FindBookIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 15.75l4.5 4.5" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+  </svg>
+);
+
+export const HandWavingIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M15.84 8.25a2.25 2.25 0 013.36 0 .75.75 0 01-.04 1.06l-1.72 1.72a.75.75 0 01-1.06 0l-.04-.04a2.25 2.25 0 010-3.36z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 11.25a2.25 2.25 0 013.36 0 .75.75 0 01-.04 1.06l-1.72 1.72a.75.75 0 01-1.06 0l-.04-.04a2.25 2.25 0 010-3.36z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M11.16 14.25a2.25 2.25 0 013.36 0 .75.75 0 01-.04 1.06l-1.72 1.72a.75.75 0 01-1.06 0l-.04-.04a2.25 2.25 0 010-3.36z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M9.16 11.5a1.5 1.5 0 012.12 0 .75.75 0 010 1.06l-1.77 1.77a.75.75 0 01-1.06 0l-.04-.04a1.5 1.5 0 010-2.12z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M4.16 6.5a1.5 1.5 0 012.12 0 .75.75 0 010 1.06l-1.77 1.77a.75.75 0 01-1.06 0l-.04-.04a1.5 1.5 0 010-2.12z" />
+  </svg>
+);
+
+export const BiohazardIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 12a3.75 3.75 0 00-3.75 3.75m0 0a3.75 3.75 0 007.5 0m-7.5 0h7.5m-7.5 0a3.75 3.75 0 01-3.75-3.75m0 0a3.75 3.75 0 017.5 0m-3.75-3.75a3.75 3.75 0 00-3.75-3.75m0 0a3.75 3.75 0 007.5 0m-7.5 0v7.5" />
+  </svg>
+);
+
+export const ExploreIcon: React.FC<IconProps> = (props) => (
+  <svg {...props} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18z" />
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 3.75c-3.142 0-6.142 2.05-7.5 5.25m15 0c-1.358-3.2-4.358-5.25-7.5-5.25m0 12.5c3.142 0 6.142-2.05 7.5-5.25m-15 0c1.358 3.2 4.358 5.25 7.5 5.25" />
+  </svg>
+);

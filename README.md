@@ -8,7 +8,7 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 
 ## Architecture Overview
 
-1.  **Robot Backend (Python + Flask):** A web server runs on the Raspberry Pi, listening for commands via a local network API. It controls the robot's hardware and communicates with the Google Gemini API.
+1.  **Robot Backend (Python + Flask):** A web server runs on the Raspberry Pi, listening for commands via a local network API. It controls the robot's hardware, runs computer vision models, and communicates with the Google Gemini API.
 2.  **Web Frontend (React - This App):** A user-friendly dashboard that runs in your browser. You use it to send commands to the robot, configure its responses, and see a live log of its activities.
 
 
@@ -17,17 +17,24 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 
 -   🌐 **Web-Based Control**: Operate your robot from any device with a web browser on the same network.
 -   📹 **Live Camera Streaming**: View a real-time video feed from the robot's camera directly in the control panel.
--   🛡️ **Autonomous Obstacle Avoidance**: Toggle a self-driving mode that uses the ultrasonic sensor to navigate and avoid obstacles.
+-   🤖 **Advanced Autopilot System**:
+    -   🧭 **Explore Mode**: An autonomous mode where the robot will randomly wander around its environment.
+    -   🚦 **Traffic Mode**: Activate a mode where the robot recognizes and responds to traffic lights and stop signs.
+    -   🚗 **Follow Car Mode**: Command the robot to detect and follow a specific object, like a toy car.
+    -   🛡️ **Obstacle Avoidance**: A basic self-driving mode that uses the ultrasonic sensor to navigate and avoid obstacles.
+-   🧠 **AI-Powered Vision & Actions**:
+    -   ✨ **Wake Word Effect**: A Google Assistant-style RGB light animation can be triggered to show the robot is 'listening'.
+    -   **Object Detection**: The robot can identify multiple objects, people, and animals in its environment.
+    -   **Find a Book**: Give the robot a task to search for and locate a book.
+    -   **AI Vision**: Command Saras to capture images and describe what it sees out loud using the Gemini API.
+    -   **Scan-a-Question**: Point the robot's camera at a written question, and it will use Gemini's multimodal capabilities to read, understand, and answer it.
+-   💬 **Interactive & Multilingual Personality**:
+    -   **Proactive Greetings**: The robot autonomously detects human or dog faces and greets them with "Namaste" in Gujarati, but only the first time it sees them.
+    -   **Gujarati Introduction**: Delivers a pre-defined introduction in **Gujarati**.
 -   🕹️ **Omnidirectional Movement Control**: Directly control the robot's mecanum wheels to move and rotate in any direction.
 -   📡 **IR Remote Control Ready**: Includes the backend code to allow control of the robot using a standard IR remote.
 -   📏 **Ultrasonic Obstacle Detection**: Trigger the ultrasonic sensor to measure distances and detect obstacles.
--   ✍️ **Dynamic Command Configuration**: Add, edit, and delete custom text commands and responses directly from the web UI. The robot learns new phrases without needing a code change.
--   📸 **Scan-a-Question**: Point the robot's camera at a written question, and it will use Gemini's multimodal capabilities to read, understand, and answer it.
 -   🔴 **Live Action Log**: See real-time status updates and responses from the robot in the control panel.
--   🧠 **Google Gemini API Integration**: Connects the robot to real-world data and provides powerful language and vision understanding.
--   👁️ **AI Vision**: Command Saras to capture images and describe what it sees out loud.
--   💬 **Custom Personality & Multilingual Responses**:
-    -   Delivers a pre-defined introduction in **Gujarati**.
 -   📚 **Guided Setup**: The application itself contains an updated, step-by-step guide to help you build the Python server backend on your robot.
 -   📦 **Downloadable Code Bundle**: Get the entire backend server project as a downloadable ZIP file directly from the UI.
 
@@ -40,5 +47,5 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 ## Technology Stack
 
 -   **Frontend (This Guide):** React, TypeScript, Tailwind CSS
--   **Backend (On Robot):** Python, Flask, google-generativeai, RPi.GPIO
+-   **Backend (On Robot):** Python, Flask, OpenCV, google-generativeai
 -   **Communication:** REST API over local network

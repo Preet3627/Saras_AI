@@ -3,15 +3,17 @@ import {
   FolderIcon,
   HardwareIcon,
   SoftwareIcon,
-  LightIcon,
-  BrainIcon,
   VisionIcon,
   RobotIcon,
   CalculatorIcon,
   BeakerIcon,
   VideoCameraIcon,
-  ShieldCheckIcon,
   RemoteControlIcon,
+  BrainIcon,
+  AutopilotIcon,
+  BiohazardIcon,
+  HandWavingIcon,
+  ExploreIcon,
 } from './components/Icons';
 
 export const STEPS: Step[] = [
@@ -24,6 +26,9 @@ export const STEPS: Step[] = [
 ├── .env
 ├── main.py
 ├── requirements.txt
+├── models/  <-- You will need to download model files here
+│   ├── yolov3-tiny.weights
+│   └── yolov3-tiny.cfg
 ├── core/
 │   ├── __init__.py
 │   ├── camera.py
@@ -31,8 +36,8 @@ export const STEPS: Step[] = [
 │   ├── ir_remote.py
 │   ├── led_control.py
 │   ├── motor_control.py
-│   ├── ultrasonic.py
-│   └── vision.py
+│   ├── object_detector.py
+│   └── ultrasonic.py
 └── utils/
     ├── __init__.py
     └── text_to_speech.py
@@ -42,373 +47,276 @@ export const STEPS: Step[] = [
     id: 2,
     title: 'Hardware & Environment Setup',
     icon: HardwareIcon,
-    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. It's recommended to use a virtual environment.`,
+    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. You will also need to download pre-trained object detection model files (like YOLOv3-tiny) and place them in the 'models' directory.`,
     code: `
 # Open a terminal on your Raspberry Pi and run these commands:
-# Create and activate a virtual environment (optional but recommended)
+# Create and activate a virtual environment
 python3 -m venv .venv
 source .venv/bin/activate
 
 # Install core libraries from your requirements file
 pip install -r requirements.txt
+
+# Download YOLOv3-tiny model files (example)
+wget -P ./models https://pjreddie.com/media/files/yolov3-tiny.weights
+wget -P ./models https://raw.githubusercontent.com/pjreddie/darknet/master/cfg/yolov3-tiny.cfg
 `,
   },
   {
     id: 3,
     title: 'Building the Web API Server',
     icon: SoftwareIcon,
-    description: `The robot's backend is a web server built with Flask. This server listens for commands from this web UI. The 'main.py' file creates API endpoints to handle movement, AI actions, and streaming. This is the core of the robot's remote control functionality.`,
+    description: `The robot's backend is a web server built with Flask. The 'main.py' file creates API endpoints to handle movement, AI actions, and streaming. It also manages background threads for continuous object detection and running autopilot modes.`,
     code: `
 # This is a simplified version of main.py
-# The full code is in the downloadable ZIP
-
-from flask import Flask, jsonify, request, Response
-from flask_cors import CORS
-# import core modules like motor_control, vision, camera
+from flask import Flask, Response
+import threading
+from core import object_detector, motor_control
 
 app = Flask(__name__)
-CORS(app) # Allow requests from the web browser
 
-# Route to handle commands
-@app.route('/command', methods=['POST'])
-def command():
-    action = request.json.get('action')
-    # Add logic to call motor_control functions
-    # e.g., if action == 'move_forward': motor_control.move_forward()
-    return jsonify(status="success", action=action)
+# Global state for robot
+LATEST_DETECTIONS = []
+AUTOPILOT_MODE = 'off'
 
-# Route for video streaming
-@app.route('/video_feed')
-def video_feed():
-    return Response(camera.generate_frames(),
-                    mimetype='multipart/x-mixed-replace; boundary=frame')
+def detection_loop():
+    """Continuously runs object detection on camera feed."""
+    global LATEST_DETECTIONS
+    detector = object_detector.ObjectDetector()
+    while True:
+        LATEST_DETECTIONS = detector.detect_objects()
+        # Add logic for proactive greetings here
+        # time.sleep(0.1)
+
+def autopilot_loop():
+    """Runs autopilot logic based on current mode and detections."""
+    while True:
+        if AUTOPILOT_MODE == 'traffic':
+            # Check LATEST_DETECTIONS for traffic lights/signs
+            # and call motor_control functions
+            pass
+        # time.sleep(0.1)
 
 if __name__ == '__main__':
-    # Run the Flask app
-    # Use different ports for command and video to handle requests simultaneously
-    # This requires running the app in threaded mode
-    app.run(host='0.0.0.0', port=5000, threaded=True)
-
+    # Start background threads
+    threading.Thread(target=detection_loop, daemon=True).start()
+    threading.Thread(target=autopilot_loop, daemon=True).start()
+    app.run(host='0.0.0.0', port=5001, threaded=True)
 `,
   },
   {
     id: 4,
     title: 'Live Camera Streaming',
     icon: VideoCameraIcon,
-    description: `To get a live video feed in the control panel, the Flask server streams video from the camera using OpenCV. A dedicated function captures frames, encodes them as JPEG, and sends them in a multipart response. This allows for a continuous, low-latency video stream.`,
+    description: `The Flask server streams video from the camera using OpenCV. A dedicated function captures frames, encodes them as JPEG, and sends them in a multipart response. For this project, we'll draw the object detection bounding boxes onto the video stream so you can see what the robot sees.`,
     code: `
-# This code goes in 'core/camera.py'
+# This code is in 'core/camera.py' and used by 'main.py'
 import cv2
-import time
 
-class Camera:
-    def __init__(self):
-        self.video = cv2.VideoCapture(0)
-        if not self.video.isOpened():
-            raise RuntimeError("Could not start camera.")
-
-    def __del__(self):
-        self.video.release()
-
-    def get_frame(self):
-        success, image = self.video.read()
-        if not success:
-            return None
-        # Encode frame as JPEG
-        ret, jpeg = cv2.imencode('.jpg', image)
-        return jpeg.tobytes()
-
-def generate_frames(camera):
+def generate_frames_with_detections(camera, detector):
     while True:
         frame = camera.get_frame()
-        if frame is None:
-            break
-        # Yield the frame in the multipart response format
-        yield (b'--frame\\r\\n'
-               b'Content-Type: image/jpeg\\r\\n\\r\\n' + frame + b'\\r\\n')
-        time.sleep(0.05) # control frame rate
-`,
-  },
-  {
-    id: 5,
-    title: 'Autonomous Obstacle Avoidance',
-    icon: ShieldCheckIcon,
-    description: `The self-drive mode works by running a loop in a background thread. This loop continuously checks the distance from the ultrasonic sensor. If an obstacle is too close, the robot stops, turns, and then continues forward, effectively navigating around objects on its own.`,
-    code: `
-# This logic is managed in 'main.py' using a background thread
-import threading
-import time
-from core import ultrasonic, motor_control
-
-AVOIDANCE_ENABLED = False
-AVOIDANCE_THREAD = None
-
-def obstacle_avoidance_loop():
-    global AVOIDANCE_ENABLED
-    while AVOIDANCE_ENABLED:
-        distance = ultrasonic.get_distance()
-        if distance > 20:
-            motor_control.move_forward(speed=40)
-        else:
-            motor_control.stop()
-            time.sleep(0.1)
-            motor_control.rotate_left(speed=50)
-            time.sleep(0.5)
-            motor_control.stop()
-        time.sleep(0.1)
-    motor_control.stop()
-
-# In the /autonomous route in main.py:
-# - When "start" is received, set AVOIDANCE_ENABLED = True
-#   and start the obstacle_avoidance_loop in a new thread.
-# - When "stop" is received, set AVOIDANCE_ENABLED = False
-#   to stop the loop.
+        if frame is not None:
+            # Get latest detections and draw them on the frame
+            detections = detector.get_latest_detections()
+            detector.draw_boxes(frame, detections)
+            
+            ret, buffer = cv2.imencode('.jpg', frame)
+            if ret:
+                yield (b'--frame\\r\\n'
+                       b'Content-Type: image/jpeg\\r\\n\\r\\n' + buffer.tobytes() + b'\\r\\n')
 `,
   },
     {
-    id: 6,
+    id: 5,
     title: 'IR Remote Control',
     icon: RemoteControlIcon,
-    description: `The Yahboom Robot HAT includes an infrared (IR) receiver. You can control the robot's movement using a standard IR remote. The code maps specific IR key codes to motor functions (e.g., arrow keys for movement, 'OK' button to stop). This runs in a background thread so it doesn't block the web server.`,
+    description: `The robot can also be controlled using a standard IR remote. The code maps specific IR key codes to motor functions (e.g., arrow keys for movement). This runs in a background thread so it doesn't block the web server or other functions.`,
     code: `
 # This code goes in 'core/ir_remote.py'
 from yahboom_robot_hat import YahboomRobot
 from core import motor_control
 import time
 
-robot = YahboomRobot()
-
 def ir_control_loop():
+    robot = YahboomRobot()
     while True:
-        try:
-            key = robot.get_ir_remote_code()
-            if key is not None:
-                print(f"IR Key Pressed: {key}")
-                if key == robot.IR_REMOTE_UP:
-                    motor_control.move_forward()
-                elif key == robot.IR_REMOTE_DOWN:
-                    motor_control.move_backward()
-                elif key == robot.IR_REMOTE_LEFT:
-                    motor_control.rotate_left()
-                elif key == robot.IR_REMOTE_RIGHT:
-                    motor_control.rotate_right()
-                elif key == robot.IR_REMOTE_OK:
-                    motor_control.stop()
-        except Exception as e:
-            print(f"IR Error: {e}")
+        key = robot.get_ir_remote_code()
+        if key is not None:
+            if key == robot.IR_REMOTE_UP: motor_control.move_forward()
+            elif key == robot.IR_REMOTE_DOWN: motor_control.move_backward()
+            elif key == robot.IR_REMOTE_LEFT: motor_control.rotate_left()
+            elif key == robot.IR_REMOTE_RIGHT: motor_control.rotate_right()
+            elif key == robot.IR_REMOTE_OK: motor_control.stop()
         time.sleep(0.1)
 
-# To use this, start ir_control_loop() in a background
-# thread from main.py when the server starts.
+# Start ir_control_loop() in a background thread from main.py.
+`,
+  },
+  {
+    id: 6,
+    title: 'Core: Object Detection',
+    icon: VisionIcon,
+    description: `This is the foundation for all advanced autonomous features. We use OpenCV's DNN module with a pre-trained model (like YOLOv3-tiny) to detect objects in the camera's view. This module ('core/object_detector.py') will identify objects like people, cars, books, and traffic signs.`,
+    code: `
+# Simplified code for 'core/object_detector.py'
+import cv2
+import numpy as np
+
+class ObjectDetector:
+    def __init__(self):
+        # Load the pre-trained model and class names
+        self.net = cv2.dnn.readNet("models/yolov3-tiny.weights", "models/yolov3-tiny.cfg")
+        # e.g., self.classes = ["person", "car", "dog", "book", "stop sign"]
+
+    def detect(self, frame):
+        # Pre-process the image and pass it through the network
+        blob = cv2.dnn.blobFromImage(frame, 1/255.0, (416, 416), swapRB=True, crop=False)
+        self.net.setInput(blob)
+        layer_outputs = self.net.forward(self.get_output_layers())
+        
+        # Post-process the results to get bounding boxes and class IDs
+        # ... logic to parse layer_outputs ...
+        
+        return detected_objects # e.g., [{"label": "person", "box": [x,y,w,h]}]
 `,
   },
   {
     id: 7,
-    title: 'Gemini API Integration',
-    icon: BrainIcon,
-    description: `This is the core of the robot's intelligence. We'll integrate the Google Gemini API to process commands, describe scenes, and generate responses. Remember to set your API key in the .env file. This code goes in 'core/gemini_ai.py'.`,
+    title: 'Implementing Autopilot Modes',
+    icon: AutopilotIcon,
+    description: `The autopilot logic, running in its own thread, continuously checks the robot's state to decide its actions. We can add different modes like Traffic Recognition, Object Following, and a new 'Explore' mode for random movement.`,
     code: `
-import os
-from google.generativeai import GoogleGenAI
-import base64
+# Logic inside the autopilot_loop() in main.py
+import random
 
-# IMPORTANT: Your API key should be in a .env file
-# and loaded securely, e.g., using python-dotenv library.
-
-ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
-
-async def get_gemini_response(prompt_text, image_path=None):
-    if image_path:
-        with open(image_path, "rb") as image_file:
-            encoded_string = base64.b64encode(image_file.read()).decode('utf-8')
+def autopilot_loop():
+    global AUTOPILOT_MODE, LATEST_DETECTIONS
+    while True:
+        # ... (other modes like traffic, follow) ...
         
-        image_part = {
-            "inlineData": {
-                "mimeType": "image/jpeg",
-                "data": encoded_string
-            }
-        }
-        text_part = {"text": prompt_text}
-        contents = {"parts": [image_part, text_part]}
-    else:
-        contents = prompt_text
+        if AUTOPILOT_MODE == 'explore':
+            # Move forward for a random duration
+            motor_control.move_forward(speed=35)
+            time.sleep(random.uniform(1.0, 2.5))
+            
+            # Choose a random turn
+            turn_function = random.choice([motor_control.rotate_left, motor_control.rotate_right])
+            turn_function(speed=50)
+            time.sleep(random.uniform(0.5, 1.5))
+            motor_control.stop()
+            time.sleep(1.0) # Pause before next action
 
-    response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: contents
-    })
-    return response.text
+        # ... (sleep)
 `,
   },
   {
     id: 8,
-    title: 'Vision: See and Describe',
-    icon: VisionIcon,
-    description: `Using the camera and Gemini's vision capabilities, Saras can describe its surroundings. A function will capture an image, send it to the Gemini API with a prompt like "Describe what you see in detail," and then speak the response. This logic belongs in 'core/vision.py'.`,
-    code: `
-import cv2
-# from utils.text_to_speech import speak
-# from core.gemini_ai import get_gemini_response
-
-def see_and_describe():
-    # Capture image from camera
-    cap = cv2.VideoCapture(0)
-    ret, frame = cap.read()
-    if ret:
-        cv2.imwrite("capture.jpg", frame)
-    cap.release()
-    
-    # Get description from Gemini
-    description = get_gemini_response("Describe this scene for me.", "capture.jpg")
-    
-    # Convert text to speech and play
-    speak(description)
-`,
-  },
-    {
-    id: 9,
-    title: 'Intelligent Actions & Custom Responses',
+    title: 'Intelligent Actions & Personality',
     icon: RobotIcon,
-    description: `Combine all features into a main control loop in 'main.py'. This function will parse the user's command after the wake word is detected and trigger the appropriate action, from object detection to custom Gujarati greetings. We'll use a set to track seen faces/dogs to ensure "Namaste" is said only once.`,
+    description: `We can trigger special actions and animations. A 'Wake Word' command can initiate a Google Assistant-style light effect, and other commands can trigger specific behaviors like the Gujarati introduction. The robot can also proactively greet people it sees.`,
     code: `
-# This code would be part of your main.py
-
-seen_entities = set()
+# Add this command to the handler in main.py
+from core import led_control
 
 def handle_command(command):
-    command = command.lower()
+    # ... other commands
+    if command == "wake_word":
+        led_control.assistant_wakeup_animation()
+        return "Listening..."
+
+# Add this new animation function to core/led_control.py using PWM
+def assistant_wakeup_animation():
+    # Pulses through Google colors (Blue, Red, Yellow, Green)
+    # This requires setting up RPi.GPIO with PWM to control brightness.
+    colors = [(0, 26, 100), (100, 0, 0), (100, 92, 23), (0, 59, 0)] # Duty cycles
     
-    if "introduce yourself" in command:
-        response_text = "હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે."
-        speak(response_text)
-    
-    elif "what do you see" in command:
-        see_and_describe()
+    for _ in range(2): # Repeat animation twice
+        for r, g, b in colors:
+            # Fade in and out logic using PWM duty cycle changes
+            # e.g., for i in range(0, 101, 10): set_color_pwm(...)
+            time.sleep(0.25)
+    turn_off()
+`,
+  },
+  {
+    id: 9,
+    title: 'Gemini API for Advanced Queries',
+    icon: BrainIcon,
+    description: `For tasks that require understanding beyond simple object detection, like describing a complex scene or answering a scanned question, we use the Google Gemini API. This allows the robot to have rich, contextual conversations.`,
+    code: `
+# This code is in 'core/gemini_ai.py'
+import os
+from google.generativeai import GoogleGenAI
+import base64
 
-    elif "find a book" in command:
-        # Code to scan room, use OpenCV object detection for 'book', and navigate
-        print("Searching for a book...")
+ai = GoogleGenAI(api_key=os.environ.get("API_KEY"))
 
-    elif "follow the car" in command:
-        # Code to detect a toy car and follow it using motor controls
-        print("Following the car...")
-
-    else: # Default to Gemini for general questions
-        response = get_gemini_response(command)
-        speak(response)
-
-def detect_and_greet():
-    # In a background thread, run object detection
-    # If a person or dog is detected for the first time:
-    entity_id = "person_1" # Get a unique ID for the detected entity
-    if entity_id not in seen_entities:
-        greeting = "નમસ્તે"
-        speak(greeting)
-        seen_entities.add(entity_id)
+async def get_gemini_response(prompt_text, image_path=None):
+    # ... (same as before)
+    # This is used for "Describe Scene" and "Scan Question"
 `,
   },
   {
     id: 10,
-    title: 'Mathematical Problem Solving',
-    icon: CalculatorIcon,
-    description: `To make Saras a helpful school assistant, we can give it the ability to solve mathematical sums. The robot will listen for phrases like "calculate" or "what is" followed by a math expression.
-
-We'll use a regular expression to find and extract the mathematical part of the command (e.g., "5 * (10 + 2)"). Then, for simplicity, we use Python's built-in 'eval()' function to compute the result.
-
-**Important Note:** Using 'eval()' can be a security risk if the input isn't controlled. For a school project this is acceptable, but for a production system, a safer math parsing library like 'asteval' is recommended.`,
+    title: 'Avoiding Harmful Creatures',
+    icon: BiohazardIcon,
+    description: `A key safety feature is the ability to recognize and avoid potential threats. This is implemented within the Autopilot logic. If the object detector identifies a "harmful creature" (e.g., a toy snake, which you would need to train your model to recognize), the robot will immediately stop and move backward.`,
     code: `
-# Add this logic inside your handle_command(command) function in main.py
-import re
+# Add this logic to your autopilot_loop in main.py
+# This check should take priority over other modes.
 
-# ... inside handle_command function
-
-elif "calculate" in command or "what is" in command or "solve" in command:
-    # Use regex to find a mathematical expression
-    math_expression = re.search(r'[\\d\\s\\+\\-\\*\\/\\(\\)]+$', command)
+def autopilot_loop():
+    # ...
     
-    if math_expression:
-        expression = math_expression.group(0).strip()
-        try:
-            # IMPORTANT: eval() can be risky. Use with trusted input.
-            result = eval(expression)
-            response_text = f"The answer is {result}."
-            print(f"Solved: {expression} = {result}")
-            speak(response_text)
-        except Exception as e:
-            print(f"Could not solve the math problem: {e}")
-            speak("I'm sorry, I couldn't understand that math problem.")
-    else:
-        speak("I didn't find a math problem to solve in your command.")
+    # Priority 1: Safety Check
+    if any(d['label'] == 'snake' for d in LATEST_DETECTIONS):
+        print("Harmful creature detected! Retreating.")
+        motor_control.move_backward(speed=70)
+        time.sleep(1.5) # Move back for 1.5 seconds
+        motor_control.stop()
+        # You might want to disable autopilot or send an alert
+        continue # Skip other logic for this cycle
 
-# Example commands this would handle:
-# "Hey Saras, what is 15 plus 27"
-# "Hey Saras, calculate 100 divided by 4"
-# "Hey Saras, solve 5 * (2 + 8)"
+    # ... logic for traffic, follow, etc.
 `,
   },
   {
     id: 11,
-    title: 'Omnidirectional Motor Control',
-    icon: HardwareIcon,
-    description: `The RASPBOT V2 uses mecanum wheels, allowing for omnidirectional movement. This means it can move forward, backward, strafe left/right, and rotate on the spot. We'll write functions in 'core/motor_control.py' to handle these complex movements by controlling the four motors individually.
-
-The Yahboom library simplifies this. You'll need to install it first: 'pip install yahboom-robot-hat'.`,
+    title: 'Proactive Greetings',
+    icon: HandWavingIcon,
+    description: `To make the robot more interactive, it will proactively greet people and dogs. The object detection loop continuously scans for faces. When a new face is detected, it says "Namaste" in Gujarati. A set stores the IDs of greeted individuals to prevent repeated greetings, creating a more natural interaction.`,
     code: `
-# This code goes in 'core/motor_control.py'
-from yahboom_robot_hat import YahboomRobot
+# This logic is added to the main detection loop in main.py
+from utils.text_to_speech import speak
 
-# Initialize the robot hardware interface
-robot = YahboomRobot()
+SEEN_FACES = set()
 
-def stop():
-    robot.set_motor(0, 0, 0, 0) # Stop all four motors
-
-def move_forward(speed=50):
-    # All wheels forward
-    robot.set_motor(speed, speed, speed, speed)
-
-def move_backward(speed=50):
-    # All wheels backward
-    robot.set_motor(-speed, -speed, -speed, -speed)
+def detection_loop():
+    # ... inside loop
+    detections = detector.detect(frame)
     
-def strafe_left(speed=50):
-    # Front-left and back-right move backward
-    # Front-right and back-left move forward
-    robot.set_motor(-speed, speed, -speed, speed)
-
-def strafe_right(speed=50):
-    # Front-left and back-right move forward
-    # Front-right and back-left move backward
-    robot.set_motor(speed, -speed, speed, -speed)
-
-def rotate_left(speed=50):
-    # Left wheels backward, right wheels forward
-    robot.set_motor(-speed, speed, -speed, speed)
-
-def rotate_right(speed=50):
-    # Left wheels forward, right wheels backward
-    robot.set_motor(speed, -speed, speed, -speed)
-
-# Example usage from main.py:
-# from core import motor_control
-# import time
-#
-# motor_control.move_forward()
-# time.sleep(1)
-# motor_control.stop()
-`,
+    # Check for persons or dogs
+    for obj in detections:
+        if obj['label'] in ['person', 'dog']:
+            # Create a simple unique ID based on position to avoid re-greeting
+            obj_id = f"{obj['label']}_{int(obj['box'][0]/50)}"
+            if obj_id not in SEEN_FACES:
+                print(f"New {obj['label']} detected. Greeting.")
+                speak("નમસ્તે", lang='gu')
+                SEEN_FACES.add(obj_id)
+                # Optional: Add a timeout to forget faces after a while
+    # ...
+`
   },
   {
     id: 12,
     title: 'Ultrasonic Distance Sensing',
     icon: BeakerIcon,
-    description: `The robot is equipped with an ultrasonic sensor to measure distances and avoid obstacles. This sensor works by sending out a sound wave and measuring how long it takes to bounce back.
-
-We can write a function in a new file, 'core/ultrasonic.py', to get the distance in centimeters. The Yahboom library also makes this straightforward.`,
+    description: `The robot is equipped with an ultrasonic sensor to measure distances. This is crucial for the basic obstacle avoidance mode and can be used as a fallback safety measure in other modes. The Yahboom library makes reading from this sensor straightforward.`,
     code: `
 # This code goes in 'core/ultrasonic.py'
 from yahboom_robot_hat import YahboomRobot
-import time
 
 robot = YahboomRobot()
 
@@ -417,22 +325,11 @@ def get_distance():
     Measures the distance using the ultrasonic sensor.
     Returns the distance in centimeters (cm).
     """
-    # The get_distance method handles the trigger and echo logic.
     distance = robot.get_distance()
     if distance is not None:
-        print(f"Distance: {distance:.2f} cm")
         return distance
     else:
-        print("Failed to get distance reading.")
         return -1 # Return an error value
-
-# Example usage from main.py:
-# from core import ultrasonic
-#
-# current_distance = ultrasonic.get_distance()
-# if current_distance < 15 and current_distance != -1:
-#     print("Obstacle detected!")
-#     # Stop the robot
 `,
   },
 ];

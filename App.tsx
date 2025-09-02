@@ -2,10 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { STEPS } from './constants';
 import { ROBOT_CODEBASE } from './codebase';
 import { StepCard } from './components/StepCard';
-import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon } from './components/Icons';
+import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon, AutopilotIcon, TrafficLightIcon, FollowIcon, FindBookIcon, ExploreIcon, BrainIcon as SparklesIcon } from './components/Icons';
 import type { LogEntry, LogLevel } from './types';
 
 declare const JSZip: any;
+
+type AutopilotMode = 'off' | 'avoid' | 'traffic' | 'follow' | 'explore';
 
 const App: React.FC = () => {
   const [robotIp, setRobotIp] = useState<string>('192.168.1.10'); // Default IP
@@ -13,7 +15,7 @@ const App: React.FC = () => {
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [isMuted, setIsMuted] = useState<boolean>(false);
-  const [isAvoiding, setIsAvoiding] = useState<boolean>(false);
+  const [autopilotMode, setAutopilotMode] = useState<AutopilotMode>('off');
   const [isStreamLoading, setIsStreamLoading] = useState<boolean>(true);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
@@ -53,17 +55,45 @@ const App: React.FC = () => {
   
   const handleAction = (command: string, response: string) => {
     addLog('System', 'command', command);
+    // Here you would typically send the command to the robot's API
+    // For this simulation, we just add a delayed response.
     setTimeout(() => addLog('Robot', 'response', response), 500);
   };
   
-  const handleToggleAvoidance = () => {
-    const nextState = !isAvoiding;
-    setIsAvoiding(nextState);
-    handleAction(
-      nextState ? 'Start Obstacle Avoidance' : 'Stop Obstacle Avoidance',
-      nextState ? 'Autonomous driving enabled.' : 'Autonomous driving disabled.'
-    );
+  const handleToggleAutopilot = (mode: AutopilotMode) => {
+    const nextMode = autopilotMode === mode ? 'off' : mode;
+    setAutopilotMode(nextMode);
+
+    let command = '';
+    let response = '';
+
+    if (nextMode === 'off') {
+        command = 'Deactivate Autopilot';
+        response = 'All autopilot systems deactivated.';
+    } else {
+        switch(nextMode) {
+            case 'avoid':
+                command = 'Activate Obstacle Avoidance';
+                response = 'Autopilot engaged: Obstacle Avoidance mode.';
+                break;
+            case 'traffic':
+                command = 'Activate Traffic Mode';
+                response = 'Autopilot engaged: Traffic Sign Recognition mode.';
+                break;
+            case 'follow':
+                command = 'Activate Follow Car Mode';
+                response = 'Autopilot engaged: Following designated car.';
+                break;
+            case 'explore':
+                command = 'Activate Explore Mode';
+                response = 'Autopilot engaged: Exploring surroundings randomly.';
+                break;
+        }
+    }
+    
+    handleAction(command, response);
   };
+
 
   const handleDownloadCode = () => {
     const zip = new JSZip();
@@ -89,7 +119,7 @@ const App: React.FC = () => {
   const handleConnect = () => {
     if (isConnected) {
       setIsConnected(false);
-      setIsAvoiding(false);
+      setAutopilotMode('off');
       playSound('disconnect');
       addLog('System', 'info', `Disconnected from robot at ${robotIp}.`);
     } else if (!isConnecting) {
@@ -216,13 +246,30 @@ const App: React.FC = () => {
                 )}
               </div>
             </div>
-
+            
             <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
-              <h3 className="text-lg font-semibold text-white mb-4">Autonomous Systems</h3>
-               <button onClick={handleToggleAvoidance} disabled={!isConnected} className={`w-full flex items-center justify-center p-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${isAvoiding ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-700 hover:bg-gray-600'}`}>
-                <ShieldCheckIcon className="h-5 w-5 mr-2" />
-                {isAvoiding ? 'Stop Self-Drive' : 'Start Self-Drive'}
-              </button>
+               <div className="flex items-center mb-4">
+                 <AutopilotIcon className="h-5 w-5 mr-3 text-cyan-400" />
+                 <h3 className="text-lg font-semibold text-white">Autopilot Systems</h3>
+               </div>
+               <div className="grid grid-cols-2 gap-4">
+                 <button onClick={() => handleToggleAutopilot('avoid')} disabled={!isConnected} className={`flex items-center justify-center p-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${autopilotMode === 'avoid' ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                   <ShieldCheckIcon className="h-5 w-5 mr-2" />
+                   Avoidance
+                 </button>
+                 <button onClick={() => handleToggleAutopilot('traffic')} disabled={!isConnected} className={`flex items-center justify-center p-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${autopilotMode === 'traffic' ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                   <TrafficLightIcon className="h-5 w-5 mr-2" />
+                   Traffic Mode
+                 </button>
+                 <button onClick={() => handleToggleAutopilot('follow')} disabled={!isConnected} className={`flex items-center justify-center p-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${autopilotMode === 'follow' ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                   <FollowIcon className="h-5 w-5 mr-2" />
+                   Follow Car
+                 </button>
+                  <button onClick={() => handleToggleAutopilot('explore')} disabled={!isConnected} className={`flex items-center justify-center p-3 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${autopilotMode === 'explore' ? 'bg-cyan-600' : 'bg-gray-700 hover:bg-gray-600'}`}>
+                   <ExploreIcon className="h-5 w-5 mr-2" />
+                   Explore
+                 </button>
+               </div>
             </div>
 
             <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
@@ -247,10 +294,11 @@ const App: React.FC = () => {
              <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
               <h3 className="text-lg font-semibold text-white mb-4">AI Actions</h3>
               <div className="grid grid-cols-2 gap-4">
+                 <button onClick={() => handleAction('Wake Word', 'Listening...')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SparklesIcon className="h-5 w-5 mr-2" />Wake Word</button>
+                 <button onClick={() => handleAction('Introduce Yourself (Gujarati)', 'હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><RobotIcon className="h-5 w-5 mr-2" />Introduce (Gujarati)</button>
+                 <button onClick={() => handleAction('Find a Book', 'Searching for a book... Found one!')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><FindBookIcon className="h-5 w-5 mr-2" />Find a Book</button>
                  <button onClick={() => handleAction('Describe Scene', 'I see a desk with a computer and a window.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><VisionIcon className="h-5 w-5 mr-2" />Describe Scene</button>
                 <button onClick={() => handleAction('Scan Question', 'The question is "What is the capital of France?". The answer is Paris.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ScanIcon className="h-5 w-5 mr-2" />Scan Question</button>
-                 <button onClick={() => handleAction('Introduce Yourself', 'Hello, my name is Saras.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><RobotIcon className="h-5 w-5 mr-2" />Introduce Yourself</button>
-                 <button onClick={() => handleAction('Custom Command', 'Executing custom command.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><SettingsIcon className="h-5 w-5 mr-2" />Custom Command</button>
               </div>
             </div>
           </div>

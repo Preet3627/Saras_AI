@@ -1,5 +1,5 @@
 {
-  "name": "Saras AI Robot Guide",
-  "description": "A comprehensive step-by-step guide to upgrading the RASPBOT V2 with Google Gemini AI, a custom wake word, and advanced, real-world interactive features.",
+  "name": "Saras AI Robot Control Panel",
+  "description": "A web-based control panel and setup guide for the Saras AI Robot. Operate the robot and configure its custom responses and language over the network.",
   "requestFramePermissions": []
 }

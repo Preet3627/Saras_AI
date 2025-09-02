@@ -2,32 +2,22 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Saras AI Robot Guide</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!--
-      Babel Standalone is a compiler that will translate your JSX/TypeScript code
-      into plain JavaScript that the browser can understand, right as the page loads.
-      This allows you to run a React/TSX project without a separate build step.
-    -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="importmap">
-      {
-        "imports": {
-          "react": "https://aistudiocdn.com/react@^19.1.1",
-          "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
-          "react/": "https://aistudiocdn.com/react@^19.1.1/"
-        }
-      }
-    </script>
-  </head>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.1.1",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.1.1/",
+    "react/": "https://aistudiocdn.com/react@^19.1.1/"
+  }
+}
+</script>
+</head>
   <body class="bg-gray-900 text-gray-100">
     <div id="root"></div>
-    <!--
-      We load the main entry point of the app here.
-      The type="text/babel" tells the Babel Standalone script to intercept and compile this file.
-      The data-type="module" ensures it's treated as an ES Module, allowing it to import other files.
-    -->
-    <script type="text/babel" data-type="module" src="./index.tsx"></script>
   </body>
 </html>

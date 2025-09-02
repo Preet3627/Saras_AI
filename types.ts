@@ -8,3 +8,12 @@ export interface Step {
   icon: React.FC<{ className?: string }>;
   code?: string;
 }
+
+export type LogLevel = 'info' | 'error' | 'command' | 'response';
+
+export interface LogEntry {
+  timestamp: string;
+  source: 'System' | 'Robot';
+  level: LogLevel;
+  message: string;
+}

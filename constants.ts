@@ -3,67 +3,51 @@ import {
   FolderIcon,
   HardwareIcon,
   SoftwareIcon,
-  MicIcon,
   LightIcon,
   BrainIcon,
   VisionIcon,
   RobotIcon,
-  CalculatorIcon
+  CalculatorIcon,
+  BeakerIcon,
+  VideoCameraIcon,
+  ShieldCheckIcon,
+  RemoteControlIcon,
 } from './components/Icons';
 
 export const STEPS: Step[] = [
   {
     id: 1,
-    title: 'Project Setup & Code Structure (Ubuntu/Raspberry Pi)',
+    title: 'Project Setup & Code Structure',
     icon: FolderIcon,
-    description: `Before writing the code, it's crucial to set up a clean and scalable project structure on your robot's operating system (like Ubuntu or Raspberry Pi OS). This keeps your code organized and easy to manage as the project grows.
-
-Here is the recommended directory structure. You can create these folders and empty files using the 'mkdir' and 'touch' commands in your terminal.`,
+    description: `This project uses a client-server model. This web page is the client. The robot runs a Python server. First, set up this directory structure on your robot's Raspberry Pi. You can download all the code for these files using the download icon in the header.`,
     code: `saras_ai_robot/
 ├── .env
-├── .gitignore
 ├── main.py
 ├── requirements.txt
 ├── core/
 │   ├── __init__.py
+│   ├── camera.py
 │   ├── gemini_ai.py
+│   ├── ir_remote.py
 │   ├── led_control.py
 │   ├── motor_control.py
-│   ├── vision.py
-│   └── wake_word.py
+│   ├── ultrasonic.py
+│   └── vision.py
 └── utils/
     ├── __init__.py
     └── text_to_speech.py
-
-# --- File Explanations ---
-#
-# .env: Stores your secret API key. (e.g., API_KEY="...")
-# .gitignore: Tells git which files to ignore (e.g., .env, __pycache__).
-# main.py: The main entry point to start the robot.
-# requirements.txt: Lists all the Python libraries needed.
-#
-# core/: Contains the core logic for the robot's main features.
-#   - gemini_ai.py: Handles all communication with the Google Gemini API.
-#   - led_control.py: Manages the RGB light animations.
-#   - motor_control.py: Controls the robot's movements.
-#   - vision.py: Manages the camera and computer vision tasks.
-#   - wake_word.py: Handles listening for "Hey Saras".
-#
-# utils/: Contains helper functions used across the project.
-#   - text_to_speech.py: Converts text responses into spoken audio.
 `,
   },
   {
     id: 2,
     title: 'Hardware & Environment Setup',
     icon: HardwareIcon,
-    description: `First, ensure your RASPBOT V2 is correctly assembled. Verify all connections for the Raspberry Pi, camera module, microphone, motor driver, and RGB LEDs.
-    
-Then, set up the software environment on your Raspberry Pi. This involves installing required Python libraries from your 'requirements.txt' file.`,
+    description: `Ensure your RASPBOT V2 is correctly assembled. Then, install the required Python libraries from the 'requirements.txt' file. It's recommended to use a virtual environment.`,
     code: `
 # Open a terminal on your Raspberry Pi and run these commands:
-# Update package lists
-sudo apt-get update && sudo apt-get upgrade -y
+# Create and activate a virtual environment (optional but recommended)
+python3 -m venv .venv
+source .venv/bin/activate
 
 # Install core libraries from your requirements file
 pip install -r requirements.txt
@@ -71,65 +55,155 @@ pip install -r requirements.txt
   },
   {
     id: 3,
-    title: 'Wake Word Detection: "Hey Saras"',
-    icon: MicIcon,
-    description: `The robot needs to listen for its wake word. We'll create a simple loop using the SpeechRecognition library to continuously listen to the microphone in the background. When "Hey Saras" is detected, it will trigger the command listening mode. This code would go in 'core/wake_word.py'.`,
+    title: 'Building the Web API Server',
+    icon: SoftwareIcon,
+    description: `The robot's backend is a web server built with Flask. This server listens for commands from this web UI. The 'main.py' file creates API endpoints to handle movement, AI actions, and streaming. This is the core of the robot's remote control functionality.`,
     code: `
-import speech_recognition as sr
+# This is a simplified version of main.py
+# The full code is in the downloadable ZIP
 
-def listen_for_wake_word():
-    r = sr.Recognizer()
-    with sr.Microphone() as source:
-        print("Listening for 'Hey Saras'...")
-        r.adjust_for_ambient_noise(source)
-        while True:
-            try:
-                audio = r.listen(source)
-                text = r.recognize_google(audio).lower()
-                print(f"Heard: {text}")
-                if "hey saras" in text or "hi saras" in text:
-                    print("Wake word detected!")
-                    # Trigger command listening and light animation
-                    listen_for_command()
-            except sr.UnknownValueError:
-                pass # Ignore if speech is not understood
-            except sr.RequestError as e:
-                print(f"Could not request results; {e}")
+from flask import Flask, jsonify, request, Response
+from flask_cors import CORS
+# import core modules like motor_control, vision, camera
+
+app = Flask(__name__)
+CORS(app) # Allow requests from the web browser
+
+# Route to handle commands
+@app.route('/command', methods=['POST'])
+def command():
+    action = request.json.get('action')
+    # Add logic to call motor_control functions
+    # e.g., if action == 'move_forward': motor_control.move_forward()
+    return jsonify(status="success", action=action)
+
+# Route for video streaming
+@app.route('/video_feed')
+def video_feed():
+    return Response(camera.generate_frames(),
+                    mimetype='multipart/x-mixed-replace; boundary=frame')
+
+if __name__ == '__main__':
+    # Run the Flask app
+    # Use different ports for command and video to handle requests simultaneously
+    # This requires running the app in threaded mode
+    app.run(host='0.0.0.0', port=5000, threaded=True)
+
 `,
   },
-    {
+  {
     id: 4,
-    title: 'RGB Light Indication',
-    icon: LightIcon,
-    description: `To provide visual feedback, the robot's RGB lights will animate when it hears the wake word. We'll use the RPi.GPIO library to control the LEDs and cycle through Google-like colors (blue, red, yellow, green) for a few seconds. This code belongs in 'core/led_control.py'.`,
+    title: 'Live Camera Streaming',
+    icon: VideoCameraIcon,
+    description: `To get a live video feed in the control panel, the Flask server streams video from the camera using OpenCV. A dedicated function captures frames, encodes them as JPEG, and sends them in a multipart response. This allows for a continuous, low-latency video stream.`,
     code: `
-import RPi.GPIO as GPIO
+# This code goes in 'core/camera.py'
+import cv2
 import time
 
-# Define GPIO pins for R, G, B
-RED_PIN, GREEN_PIN, BLUE_PIN = 17, 27, 22 
+class Camera:
+    def __init__(self):
+        self.video = cv2.VideoCapture(0)
+        if not self.video.isOpened():
+            raise RuntimeError("Could not start camera.")
 
-def setup_leds():
-    GPIO.setmode(GPIO.BCM)
-    GPIO.setup([RED_PIN, GREEN_PIN, BLUE_PIN], GPIO.OUT)
+    def __del__(self):
+        self.video.release()
 
-def google_light_animation():
-    colors = [(1,0,0), (0,1,0), (0,0,1), (1,1,0)] # Red, Green, Blue, Yellow
-    for _ in range(3): # Loop animation
-        for r,g,b in colors:
-            GPIO.output(RED_PIN, r)
-            GPIO.output(GREEN_PIN, g)
-            GPIO.output(BLUE_PIN, b)
-            time.sleep(0.5)
-    # Turn off lights
-    GPIO.output([RED_PIN, GREEN_PIN, BLUE_PIN], 0)
+    def get_frame(self):
+        success, image = self.video.read()
+        if not success:
+            return None
+        # Encode frame as JPEG
+        ret, jpeg = cv2.imencode('.jpg', image)
+        return jpeg.tobytes()
 
-# Call this function after "Hey Saras" is detected
-# google_light_animation()
+def generate_frames(camera):
+    while True:
+        frame = camera.get_frame()
+        if frame is None:
+            break
+        # Yield the frame in the multipart response format
+        yield (b'--frame\\r\\n'
+               b'Content-Type: image/jpeg\\r\\n\\r\\n' + frame + b'\\r\\n')
+        time.sleep(0.05) # control frame rate
 `,
   },
   {
     id: 5,
+    title: 'Autonomous Obstacle Avoidance',
+    icon: ShieldCheckIcon,
+    description: `The self-drive mode works by running a loop in a background thread. This loop continuously checks the distance from the ultrasonic sensor. If an obstacle is too close, the robot stops, turns, and then continues forward, effectively navigating around objects on its own.`,
+    code: `
+# This logic is managed in 'main.py' using a background thread
+import threading
+import time
+from core import ultrasonic, motor_control
+
+AVOIDANCE_ENABLED = False
+AVOIDANCE_THREAD = None
+
+def obstacle_avoidance_loop():
+    global AVOIDANCE_ENABLED
+    while AVOIDANCE_ENABLED:
+        distance = ultrasonic.get_distance()
+        if distance > 20:
+            motor_control.move_forward(speed=40)
+        else:
+            motor_control.stop()
+            time.sleep(0.1)
+            motor_control.rotate_left(speed=50)
+            time.sleep(0.5)
+            motor_control.stop()
+        time.sleep(0.1)
+    motor_control.stop()
+
+# In the /autonomous route in main.py:
+# - When "start" is received, set AVOIDANCE_ENABLED = True
+#   and start the obstacle_avoidance_loop in a new thread.
+# - When "stop" is received, set AVOIDANCE_ENABLED = False
+#   to stop the loop.
+`,
+  },
+    {
+    id: 6,
+    title: 'IR Remote Control',
+    icon: RemoteControlIcon,
+    description: `The Yahboom Robot HAT includes an infrared (IR) receiver. You can control the robot's movement using a standard IR remote. The code maps specific IR key codes to motor functions (e.g., arrow keys for movement, 'OK' button to stop). This runs in a background thread so it doesn't block the web server.`,
+    code: `
+# This code goes in 'core/ir_remote.py'
+from yahboom_robot_hat import YahboomRobot
+from core import motor_control
+import time
+
+robot = YahboomRobot()
+
+def ir_control_loop():
+    while True:
+        try:
+            key = robot.get_ir_remote_code()
+            if key is not None:
+                print(f"IR Key Pressed: {key}")
+                if key == robot.IR_REMOTE_UP:
+                    motor_control.move_forward()
+                elif key == robot.IR_REMOTE_DOWN:
+                    motor_control.move_backward()
+                elif key == robot.IR_REMOTE_LEFT:
+                    motor_control.rotate_left()
+                elif key == robot.IR_REMOTE_RIGHT:
+                    motor_control.rotate_right()
+                elif key == robot.IR_REMOTE_OK:
+                    motor_control.stop()
+        except Exception as e:
+            print(f"IR Error: {e}")
+        time.sleep(0.1)
+
+# To use this, start ir_control_loop() in a background
+# thread from main.py when the server starts.
+`,
+  },
+  {
+    id: 7,
     title: 'Gemini API Integration',
     icon: BrainIcon,
     description: `This is the core of the robot's intelligence. We'll integrate the Google Gemini API to process commands, describe scenes, and generate responses. Remember to set your API key in the .env file. This code goes in 'core/gemini_ai.py'.`,
@@ -167,7 +241,7 @@ async def get_gemini_response(prompt_text, image_path=None):
 `,
   },
   {
-    id: 6,
+    id: 8,
     title: 'Vision: See and Describe',
     icon: VisionIcon,
     description: `Using the camera and Gemini's vision capabilities, Saras can describe its surroundings. A function will capture an image, send it to the Gemini API with a prompt like "Describe what you see in detail," and then speak the response. This logic belongs in 'core/vision.py'.`,
@@ -192,7 +266,7 @@ def see_and_describe():
 `,
   },
     {
-    id: 7,
+    id: 9,
     title: 'Intelligent Actions & Custom Responses',
     icon: RobotIcon,
     description: `Combine all features into a main control loop in 'main.py'. This function will parse the user's command after the wake word is detected and trigger the appropriate action, from object detection to custom Gujarati greetings. We'll use a set to track seen faces/dogs to ensure "Namaste" is said only once.`,
@@ -234,7 +308,7 @@ def detect_and_greet():
 `,
   },
   {
-    id: 8,
+    id: 10,
     title: 'Mathematical Problem Solving',
     icon: CalculatorIcon,
     description: `To make Saras a helpful school assistant, we can give it the ability to solve mathematical sums. The robot will listen for phrases like "calculate" or "what is" followed by a math expression.
@@ -270,6 +344,95 @@ elif "calculate" in command or "what is" in command or "solve" in command:
 # "Hey Saras, what is 15 plus 27"
 # "Hey Saras, calculate 100 divided by 4"
 # "Hey Saras, solve 5 * (2 + 8)"
+`,
+  },
+  {
+    id: 11,
+    title: 'Omnidirectional Motor Control',
+    icon: HardwareIcon,
+    description: `The RASPBOT V2 uses mecanum wheels, allowing for omnidirectional movement. This means it can move forward, backward, strafe left/right, and rotate on the spot. We'll write functions in 'core/motor_control.py' to handle these complex movements by controlling the four motors individually.
+
+The Yahboom library simplifies this. You'll need to install it first: 'pip install yahboom-robot-hat'.`,
+    code: `
+# This code goes in 'core/motor_control.py'
+from yahboom_robot_hat import YahboomRobot
+
+# Initialize the robot hardware interface
+robot = YahboomRobot()
+
+def stop():
+    robot.set_motor(0, 0, 0, 0) # Stop all four motors
+
+def move_forward(speed=50):
+    # All wheels forward
+    robot.set_motor(speed, speed, speed, speed)
+
+def move_backward(speed=50):
+    # All wheels backward
+    robot.set_motor(-speed, -speed, -speed, -speed)
+    
+def strafe_left(speed=50):
+    # Front-left and back-right move backward
+    # Front-right and back-left move forward
+    robot.set_motor(-speed, speed, -speed, speed)
+
+def strafe_right(speed=50):
+    # Front-left and back-right move forward
+    # Front-right and back-left move backward
+    robot.set_motor(speed, -speed, speed, -speed)
+
+def rotate_left(speed=50):
+    # Left wheels backward, right wheels forward
+    robot.set_motor(-speed, speed, -speed, speed)
+
+def rotate_right(speed=50):
+    # Left wheels forward, right wheels backward
+    robot.set_motor(speed, -speed, speed, -speed)
+
+# Example usage from main.py:
+# from core import motor_control
+# import time
+#
+# motor_control.move_forward()
+# time.sleep(1)
+# motor_control.stop()
+`,
+  },
+  {
+    id: 12,
+    title: 'Ultrasonic Distance Sensing',
+    icon: BeakerIcon,
+    description: `The robot is equipped with an ultrasonic sensor to measure distances and avoid obstacles. This sensor works by sending out a sound wave and measuring how long it takes to bounce back.
+
+We can write a function in a new file, 'core/ultrasonic.py', to get the distance in centimeters. The Yahboom library also makes this straightforward.`,
+    code: `
+# This code goes in 'core/ultrasonic.py'
+from yahboom_robot_hat import YahboomRobot
+import time
+
+robot = YahboomRobot()
+
+def get_distance():
+    """
+    Measures the distance using the ultrasonic sensor.
+    Returns the distance in centimeters (cm).
+    """
+    # The get_distance method handles the trigger and echo logic.
+    distance = robot.get_distance()
+    if distance is not None:
+        print(f"Distance: {distance:.2f} cm")
+        return distance
+    else:
+        print("Failed to get distance reading.")
+        return -1 # Return an error value
+
+# Example usage from main.py:
+# from core import ultrasonic
+#
+# current_distance = ultrasonic.get_distance()
+# if current_distance < 15 and current_distance != -1:
+#     print("Obstacle detected!")
+#     # Stop the robot
 `,
   },
 ];

@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { STEPS } from './constants';
 import { ROBOT_CODEBASE } from './codebase';
 import { StepCard } from './components/StepCard';
-import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon, AutopilotIcon, TrafficLightIcon, FollowIcon, FindBookIcon, ExploreIcon, BrainIcon as SparklesIcon } from './components/Icons';
-import type { LogEntry, LogLevel } from './types';
+import { LogoIcon, TerminalIcon, SettingsIcon, ScanIcon, RobotIcon, VisionIcon, SpeakerOnIcon, SpeakerOffIcon, ArrowUpIcon, ArrowDownIcon, ArrowLeftIcon, ArrowRightIcon, ArrowUturnLeftIcon, ArrowUturnRightIcon, StopIcon, BeakerIcon, DownloadIcon, ShieldCheckIcon, VideoCameraIcon, AutopilotIcon, TrafficLightIcon, FollowIcon, FindBookIcon, ExploreIcon, BrainIcon as SparklesIcon, ChatBubbleLeftRightIcon, TrashIcon, PlayIcon } from './components/Icons';
+import type { LogEntry, LogLevel, CustomResponse } from './types';
 
 declare const JSZip: any;
 
@@ -17,6 +17,15 @@ const App: React.FC = () => {
   const [isMuted, setIsMuted] = useState<boolean>(false);
   const [autopilotMode, setAutopilotMode] = useState<AutopilotMode>('off');
   const [isStreamLoading, setIsStreamLoading] = useState<boolean>(true);
+  
+  // State for custom responses
+  const [customResponses, setCustomResponses] = useState<CustomResponse[]>([
+    { id: 1, question: "Who are you?", answer: "I am Saras, an AI Robot." },
+    { id: 2, question: "What can you do?", answer: "I can see, move, talk, and learn new things!" }
+  ]);
+  const [newQuestion, setNewQuestion] = useState<string>('');
+  const [newAnswer, setNewAnswer] = useState<string>('');
+
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const connectSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -59,6 +68,44 @@ const App: React.FC = () => {
     // For this simulation, we just add a delayed response.
     setTimeout(() => addLog('Robot', 'response', response), 500);
   };
+
+  const handleAddResponse = () => {
+    if (!newQuestion.trim() || !newAnswer.trim()) {
+      addLog('System', 'error', 'Question and Answer cannot be empty.');
+      return;
+    }
+    const newResponse: CustomResponse = { id: Date.now(), question: newQuestion, answer: newAnswer };
+    setCustomResponses([...customResponses, newResponse]);
+    setNewQuestion('');
+    setNewAnswer('');
+    addLog('System', 'info', `Custom response for "${newQuestion}" added. Save to robot to apply.`);
+  };
+
+  const handleDeleteResponse = (id: number) => {
+    setCustomResponses(customResponses.filter(r => r.id !== id));
+    addLog('System', 'info', 'Custom response removed.');
+  };
+  
+  const handleSaveResponsesToRobot = () => {
+    addLog('System', 'command', 'Saving all custom responses to robot...');
+    // In a real app, this would be an API call:
+    // fetch(`http://${robotIp}:5001/custom-responses`, { 
+    //   method: 'POST', 
+    //   headers: {'Content-Type': 'application/json'},
+    //   body: JSON.stringify({ responses: customResponses })
+    // });
+    setTimeout(() => {
+        addLog('Robot', 'response', 'Custom responses updated successfully.');
+    }, 500);
+  };
+  
+  const handleTestResponse = (question: string, answer: string) => {
+    addLog('System', 'command', `Testing custom response for: "${question}"`);
+    setTimeout(() => {
+        addLog('Robot', 'response', answer);
+    }, 500);
+  };
+
   
   const handleToggleAutopilot = (mode: AutopilotMode) => {
     const nextMode = autopilotMode === mode ? 'off' : mode;
@@ -145,7 +192,7 @@ const App: React.FC = () => {
           <div className="flex items-center space-x-3">
             <LogoIcon className="h-10 w-10 text-cyan-400" />
             <div>
-              <h1 className="text-2xl font-bold text-white">Saras AI Robot</h1>
+              <h1 className="text-2xl font-bold text-white animate-rgb-text-glow">Saras AI Robot</h1>
               <p className="text-sm text-gray-400">Control Panel & Setup Guide</p>
             </div>
           </div>
@@ -301,6 +348,38 @@ const App: React.FC = () => {
                 <button onClick={() => handleAction('Scan Question', 'The question is "What is the capital of France?". The answer is Paris.')} disabled={!isConnected} className="flex items-center justify-center p-3 bg-gray-700 rounded-md hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"><ScanIcon className="h-5 w-5 mr-2" />Scan Question</button>
               </div>
             </div>
+
+            <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg shadow-lg p-6 backdrop-blur-sm">
+               <div className="flex items-center justify-between mb-4">
+                 <div className="flex items-center">
+                   <ChatBubbleLeftRightIcon className="h-5 w-5 mr-3 text-cyan-400" />
+                   <h3 className="text-lg font-semibold text-white">Custom AI Responses</h3>
+                 </div>
+                 <button onClick={handleSaveResponsesToRobot} disabled={!isConnected || customResponses.length === 0} className="px-4 py-1 text-sm bg-cyan-600 hover:bg-cyan-700 rounded-md disabled:opacity-50 disabled:cursor-not-allowed transition-colors">Save to Robot</button>
+               </div>
+               <div className="space-y-4">
+                 <div className="space-y-2">
+                   <input type="text" value={newQuestion} onChange={(e) => setNewQuestion(e.target.value)} placeholder="When user says..." className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
+                   <textarea value={newAnswer} onChange={(e) => setNewAnswer(e.target.value)} placeholder="Robot will answer..." rows={2} className="w-full bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500"/>
+                 </div>
+                 <button onClick={handleAddResponse} className="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-md font-semibold transition-colors">Add Response</button>
+               </div>
+               <div className="mt-6 space-y-3 max-h-60 overflow-y-auto pr-2">
+                 {customResponses.map((res) => (
+                   <div key={res.id} className="bg-gray-900/50 p-3 rounded-md border border-gray-700 flex justify-between items-center">
+                     <div className="flex-1">
+                       <p className="text-sm font-semibold text-purple-300">{res.question}</p>
+                       <p className="text-sm text-cyan-300 mt-1">{res.answer}</p>
+                     </div>
+                     <div className="flex items-center space-x-2 ml-4">
+                       <button onClick={() => handleTestResponse(res.question, res.answer)} disabled={!isConnected} className="p-2 text-gray-400 hover:text-white disabled:opacity-50 transition-colors" aria-label="Test Response"><PlayIcon className="h-5 w-5"/></button>
+                       <button onClick={() => handleDeleteResponse(res.id)} className="p-2 text-gray-400 hover:text-red-500 transition-colors" aria-label="Delete Response"><TrashIcon className="h-5 w-5"/></button>
+                     </div>
+                   </div>
+                 ))}
+               </div>
+            </div>
+
           </div>
         </div>
       </main>

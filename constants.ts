@@ -14,6 +14,7 @@ import {
   BiohazardIcon,
   HandWavingIcon,
   ExploreIcon,
+  ChatBubbleLeftRightIcon,
 } from './components/Icons';
 
 export const STEPS: Step[] = [
@@ -78,6 +79,7 @@ app = Flask(__name__)
 # Global state for robot
 LATEST_DETECTIONS = []
 AUTOPILOT_MODE = 'off'
+CUSTOM_RESPONSES = {}
 
 def detection_loop():
     """Continuously runs object detection on camera feed."""
@@ -241,6 +243,38 @@ def assistant_wakeup_animation():
   },
   {
     id: 9,
+    title: 'Customizing AI Responses',
+    icon: ChatBubbleLeftRightIcon,
+    description: `You can teach Saras new things! The robot's backend can store a dictionary of custom question-and-answer pairs. A dedicated API endpoint allows the web UI to send and update these responses, making the robot's personality fully customizable.`,
+    code: `
+# In main.py, add a global dictionary
+CUSTOM_RESPONSES = {}
+
+# Create a new endpoint to receive updates from the web UI
+@app.route('/custom-responses', methods=['POST'])
+def handle_custom_responses():
+    global CUSTOM_RESPONSES
+    data = request.json
+    # The UI sends a list of {"question": q, "answer": a}
+    # We convert it to a dictionary for fast lookups
+    responses_list = data.get('responses', [])
+    CUSTOM_RESPONSES = {item['question']: item['answer'] for item in responses_list}
+    print(f"Updated custom responses: {len(CUSTOM_RESPONSES)} items.")
+    return jsonify(status="success")
+
+# Modify your command handler to check for custom questions
+def handle_command(command, text):
+    # Check if the text matches a custom question
+    if text and text in CUSTOM_RESPONSES:
+        answer = CUSTOM_RESPONSES[text]
+        text_to_speech.speak(answer)
+        return answer
+    
+    # ... handle other commands like 'move_forward', 'wake_word' etc.
+`,
+  },
+  {
+    id: 10,
     title: 'Gemini API for Advanced Queries',
     icon: BrainIcon,
     description: `For tasks that require understanding beyond simple object detection, like describing a complex scene or answering a scanned question, we use the Google Gemini API. This allows the robot to have rich, contextual conversations.`,
@@ -258,7 +292,7 @@ async def get_gemini_response(prompt_text, image_path=None):
 `,
   },
   {
-    id: 10,
+    id: 11,
     title: 'Avoiding Harmful Creatures',
     icon: BiohazardIcon,
     description: `A key safety feature is the ability to recognize and avoid potential threats. This is implemented within the Autopilot logic. If the object detector identifies a "harmful creature" (e.g., a toy snake, which you would need to train your model to recognize), the robot will immediately stop and move backward.`,
@@ -282,7 +316,7 @@ def autopilot_loop():
 `,
   },
   {
-    id: 11,
+    id: 12,
     title: 'Proactive Greetings',
     icon: HandWavingIcon,
     description: `To make the robot more interactive, it will proactively greet people and dogs. The object detection loop continuously scans for faces. When a new face is detected, it says "Namaste" in Gujarati. A set stores the IDs of greeted individuals to prevent repeated greetings, creating a more natural interaction.`,
@@ -310,7 +344,7 @@ def detection_loop():
 `
   },
   {
-    id: 12,
+    id: 13,
     title: 'Ultrasonic Distance Sensing',
     icon: BeakerIcon,
     description: `The robot is equipped with an ultrasonic sensor to measure distances. This is crucial for the basic obstacle avoidance mode and can be used as a fallback safety measure in other modes. The Yahboom library makes reading from this sensor straightforward.`,

@@ -1,5 +1,5 @@
 {
-  "name": "Saras AI Robot Control Panel",
+  "name": "Saras AI Robot",
   "description": "A web-based control panel and setup guide for the Saras AI Robot. Operate the robot and configure its custom responses and language over the network.",
   "requestFramePermissions": []
 }

@@ -101,7 +101,8 @@ STATE = {
     "latest_detections": [],
     "autopilot_mode": "off", # 'off', 'avoid', 'traffic', 'follow', 'explore'
     "seen_entities": set(),
-    "is_running": True
+    "is_running": True,
+    "custom_responses": {} # Stores question:answer pairs
 }
 
 # --- Initialization ---
@@ -226,7 +227,14 @@ def index():
 def handle_command():
     data = request.json
     command = data.get('command')
+    text = data.get('text') # Optional text payload
     print(f"Received command: {command}")
+
+    # Check for custom responses first
+    if command == "test_custom_response" and text in STATE["custom_responses"]:
+        response_text = STATE["custom_responses"][text]
+        text_to_speech.speak(response_text)
+        return jsonify(status="success", message=response_text)
 
     # Manual Movement
     if command == 'move_forward': motor_control.move_forward()
@@ -276,6 +284,14 @@ def handle_autopilot():
         return jsonify(status="success", message=f"Autopilot mode set to {mode}.")
     
     return jsonify(status="error", message="Invalid mode.")
+
+@app.route('/custom-responses', methods=['POST'])
+def handle_custom_responses():
+    data = request.json.get('responses', [])
+    # Convert list of dicts to a single dict for fast lookups
+    STATE["custom_responses"] = {item['question']: item['answer'] for item in data}
+    print(f"Updated custom responses. Total: {len(STATE['custom_responses'])}")
+    return jsonify(status="success", message="Custom responses updated.")
 
 
 @app.route('/video_feed')

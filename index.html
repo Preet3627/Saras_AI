@@ -16,6 +16,18 @@
   }
 }
 </script>
+<style>
+  @keyframes rgb-text-glow {
+    0% { text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 15px #ff7300, 0 0 20px #ff7300; }
+    25% { text-shadow: 0 0 5px #ffff00, 0 0 10px #ffff00, 0 0 15px #48ff00, 0 0 20px #48ff00; }
+    50% { text-shadow: 0 0 5px #00ffd5, 0 0 10px #00ffd5, 0 0 15px #002bff, 0 0 20px #002bff; }
+    75% { text-shadow: 0 0 5px #7a00ff, 0 0 10px #7a00ff, 0 0 15px #ff00c8, 0 0 20px #ff00c8; }
+    100% { text-shadow: 0 0 5px #ff0000, 0 0 10px #ff0000, 0 0 15px #ff7300, 0 0 20px #ff7300; }
+  }
+  .animate-rgb-text-glow {
+    animation: rgb-text-glow 8s ease-in-out infinite;
+  }
+</style>
 </head>
   <body class="bg-gray-900 text-gray-100">
     <div id="root"></div>

@@ -17,3 +17,9 @@ export interface LogEntry {
   level: LogLevel;
   message: string;
 }
+
+export interface CustomResponse {
+  id: number;
+  question: string;
+  answer: string;
+}

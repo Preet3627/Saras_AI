@@ -23,6 +23,7 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
     -   🚗 **Follow Car Mode**: Command the robot to detect and follow a specific object, like a toy car.
     -   🛡️ **Obstacle Avoidance**: A basic self-driving mode that uses the ultrasonic sensor to navigate and avoid obstacles.
 -   🧠 **AI-Powered Vision & Actions**:
+    -   ✍️ **Editable Custom Responses**: Teach Saras custom replies to your own questions directly from the web UI.
     -   ✨ **Wake Word Effect**: A Google Assistant-style RGB light animation can be triggered to show the robot is 'listening'.
     -   **Object Detection**: The robot can identify multiple objects, people, and animals in its environment.
     -   **Find a Book**: Give the robot a task to search for and locate a book.
@@ -43,6 +44,52 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 1.  **Frontend**: Open the `index.html` file in your browser. This is your control panel.
 2.  **Backend**: Follow the "Setup Guide" steps displayed in the web application. You can download the complete code bundle using the download button in the header.
 3.  **Connect**: Once the Python server is running on the robot, enter the robot's IP address into the control panel and click "Connect". You can now control your Saras AI Robot!
+
+### Running on Startup (Recommended)
+
+To make your robot truly autonomous, you should configure the Python server to start automatically whenever the Raspberry Pi boots up. The best way to do this is with a `systemd` service.
+
+1.  **Create a Service File**: Open a new service file using a terminal text editor on your Pi:
+    ```bash
+    sudo nano /etc/systemd/system/saras-robot.service
+    ```
+
+2.  **Add the Service Configuration**: Paste the following content into the file. **Important:** Make sure the `WorkingDirectory` and `ExecStart` paths match the location of your project and its virtual environment on the Pi (the example below assumes it's in `/home/pi/saras_ai_robot`).
+
+    ```ini
+    [Unit]
+    Description=Saras AI Robot Server
+    After=network.target
+
+    [Service]
+    User=pi
+    Group=pi
+    WorkingDirectory=/home/pi/saras_ai_robot
+    ExecStart=/home/pi/saras_ai_robot/.venv/bin/gunicorn --workers 3 --bind 0.0.0.0:5001 main:app
+    Restart=always
+
+    [Install]
+    WantedBy=multi-user.target
+    ```
+    Save the file and exit the editor (in `nano`, press `Ctrl+X`, then `Y`, then `Enter`).
+
+3.  **Enable and Start the Service**: Now, tell `systemd` to recognize and start your new service:
+    ```bash
+    # Reload the systemd daemon to recognize the new file
+    sudo systemctl daemon-reload
+
+    # Enable the service to start on boot
+    sudo systemctl enable saras-robot.service
+
+    # Start the service immediately
+    sudo systemctl start saras-robot.service
+    ```
+
+4.  **Check the Status**: You can verify that the service is running correctly with:
+    ```bash
+    sudo systemctl status saras-robot.service
+    ```
+    If it's working, you should see an "active (running)" status. Now, your robot's server will start automatically every time you turn it on!
 
 ## Technology Stack
 

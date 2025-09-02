@@ -1,0 +1,12 @@
+Flask
+Flask-Cors
+google-generativeai
+python-dotenv
+yahboom-robot-hat
+opencv-python-headless
+numpy
+gunicorn
+RPi.GPIO
+SpeechRecognition
+PyAudio
+Pillow

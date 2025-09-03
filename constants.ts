@@ -24,7 +24,7 @@ export const STEPS: Step[] = [
     title: 'Project Setup & Code Structure',
     icon: FolderIcon,
     description: `This project uses a client-server model. This web page is the client. The robot runs a Python server. First, set up this directory structure on your robot's Raspberry Pi. You can download all the code for these files using the download icon in the header.`,
-    code: `saras_ai_robot/
+    code: `garud_ai_robot/
 ├── .env
 ├── main.py
 ├── requirements.txt
@@ -91,7 +91,7 @@ STATE = {
     "latest_detections": [],
     "autopilot_mode": "off",
     "custom_responses": {},
-    "wake_word": "hey saras"
+    "wake_word": "hey garud"
 }
 
 def detection_loop():
@@ -254,12 +254,12 @@ def assistant_wakeup_animation():
     id: 9,
     title: 'Customizable Wake Word',
     icon: MicIcon,
-    description: `Make the robot truly hands-free by implementing a customizable voice wake word. The robot will use its microphone to continuously listen for a specific phrase (e.g., "Hey Saras"). When detected, it will trigger the "listening" LED animation. The wake word can be changed from the web UI.`,
+    description: `Make the robot truly hands-free by implementing a customizable voice wake word. The robot will use its microphone to continuously listen for a specific phrase (e.g., "Hey Garud"). When detected, it will trigger the "listening" LED animation. The wake word can be changed from the web UI.`,
     code: `
 # Add to main.py
 from core import wake_word
 
-STATE = { "wake_word": "hey saras", ... }
+STATE = { "wake_word": "hey garud", ... }
 
 @app.route('/set-wake-word', methods=['POST'])
 def set_wake_word():
@@ -293,7 +293,7 @@ def listen_for_wake_word(get_wake_word_func, callback_func):
     id: 10,
     title: 'Customizing AI Responses',
     icon: ChatBubbleLeftRightIcon,
-    description: `You can teach Saras new things! The robot's backend can store a dictionary of custom question-and-answer pairs. A dedicated API endpoint allows the web UI to send and update these responses, making the robot's personality fully customizable.`,
+    description: `You can teach Garud new things! The robot's backend can store a dictionary of custom question-and-answer pairs. A dedicated API endpoint allows the web UI to send and update these responses, making the robot's personality fully customizable.`,
     code: `
 # In main.py, add a global dictionary
 CUSTOM_RESPONSES = {}
@@ -324,18 +324,30 @@ def handle_command(command, text):
     code: `
 # This code is in 'core/gemini_ai.py'
 import os
-import google.generativeai as genai
-from PIL import Image
+from google.generativeai import GenerativeModel
 
-genai.configure(api_key=os.environ["API_KEY"])
-model = genai.GenerativeModel('gemini-2.5-flash')
+# This code is using the new Google AI SDK
+from gemini.client import GoogleGenAI
+from gemini.types.content import Part
 
-def get_gemini_response(prompt_text, image_path=None):
+# Correct initialization
+ai = GoogleGenAI(api_key=os.environ["API_KEY"])
+
+async def get_gemini_response(prompt_text, image_path=None):
     if image_path:
-        img = Image.open(image_path)
-        response = model.generate_content([prompt_text, img])
+        img_part = Part.from_uri(
+            uri=image_path,
+            mime_type="image/jpeg",
+        )
+        response = await ai.generate_content(
+            model="gemini-2.5-flash",
+            contents=[prompt_text, img_part],
+        )
     else:
-        response = model.generate_content(prompt_text)
+        response = await ai.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt_text,
+        )
     return response.text
 `,
   },

@@ -10,6 +10,7 @@ declare const JSZip: any;
 type AutopilotMode = 'off' | 'avoid' | 'traffic' | 'follow' | 'explore';
 
 const App: React.FC = () => {
+  const [view, setView] = useState<'landing' | 'app'>('landing');
   const [robotIp, setRobotIp] = useState<string>('192.168.1.10'); // Default IP
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
@@ -19,13 +20,13 @@ const App: React.FC = () => {
   const [isStreamLoading, setIsStreamLoading] = useState<boolean>(true);
   
   const [customResponses, setCustomResponses] = useState<CustomResponse[]>([
-    { id: 1, question: "Who are you?", answer: "I am Saras, an AI Robot." },
+    { id: 1, question: "Who are you?", answer: "I am Garud, an AI Robot." },
     { id: 2, question: "What can you do?", answer: "I can see, move, talk, and learn new things!" }
   ]);
   const [newQuestion, setNewQuestion] = useState<string>('');
   const [newAnswer, setNewAnswer] = useState<string>('');
   
-  const [wakeWord, setWakeWord] = useState<string>('hey saras');
+  const [wakeWord, setWakeWord] = useState<string>('hey garud');
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const connectSoundRef = useRef<HTMLAudioElement | null>(null);
@@ -137,7 +138,7 @@ const App: React.FC = () => {
 
   const handleDownloadCode = () => {
     const zip = new JSZip();
-    const rootFolder = zip.folder("saras_ai_robot");
+    const rootFolder = zip.folder("garud_ai_robot");
 
     if (rootFolder) {
       for (const [filePath, content] of Object.entries(ROBOT_CODEBASE)) {
@@ -148,7 +149,7 @@ const App: React.FC = () => {
     zip.generateAsync({ type: "blob" }).then(content => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(content);
-      link.download = "saras_ai_robot.zip";
+      link.download = "garud_ai_robot.zip";
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -170,14 +171,39 @@ const App: React.FC = () => {
         setIsConnected(true);
         setIsStreamLoading(true);
         playSound('connect');
-        addLog('System', 'info', 'Successfully connected to Saras AI Robot.');
-        addLog('Robot', 'response', 'Hello! I am Saras. How can I help you today?');
+        addLog('System', 'info', 'Successfully connected to Garud AI Robot.');
+        addLog('Robot', 'response', 'Hello! I am Garud. How can I help you today?');
         setIsConnecting(false);
       }, 1500);
     }
   };
 
   const cameraUrl = isConnected ? `http://${robotIp}:5001/video_feed` : '';
+
+  if (view === 'landing') {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center text-center p-4">
+        <div className="max-w-3xl">
+            <div className="flex justify-center items-center space-x-4 mb-6">
+                <LogoIcon className="h-16 w-16 text-cyan-400" />
+                <h1 className="text-5xl md:text-6xl font-bold text-white animate-rgb-text-glow">Garud AI Robot</h1>
+            </div>
+            <p className="text-lg md:text-xl text-gray-300 mb-8">
+                A web-based control panel and setup guide for an intelligent, interactive AI assistant built on the Yahboom RASPBOT V2. This project brings together hardware control, computer vision, and the power of the Gemini API.
+            </p>
+            <p className="text-md text-gray-500 mb-10">This project was developed for PM SHRI PRATHMIK VIDHYAMANDIR PONSRI.</p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <button onClick={() => setView('app')} className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 shadow-lg">
+                    Launch Control Panel & Guide
+                </button>
+                <a href="https://github.com/google/project-gameface" target="_blank" rel="noopener noreferrer" className="w-full sm:w-auto bg-gray-700 hover:bg-gray-600 text-white font-bold py-3 px-8 rounded-lg text-lg transition-transform transform hover:scale-105 shadow-lg">
+                    View on GitHub
+                </a>
+            </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 font-sans">
@@ -186,7 +212,7 @@ const App: React.FC = () => {
           <div className="flex items-center space-x-3">
             <LogoIcon className="h-10 w-10 text-cyan-400" />
             <div>
-              <h1 className="text-2xl font-bold text-white animate-rgb-text-glow">Saras AI Robot</h1>
+              <h1 className="text-2xl font-bold text-white animate-rgb-text-glow">Garud AI Robot</h1>
               <p className="text-sm text-gray-400">Control Panel & Setup Guide</p>
             </div>
           </div>
@@ -303,7 +329,7 @@ const App: React.FC = () => {
                             onChange={(e) => setWakeWord(e.target.value)}
                             disabled={!isConnected}
                             className="flex-grow bg-gray-900 border border-gray-600 rounded-md px-3 py-2 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:opacity-50"
-                            placeholder="e.g., Hey Saras"
+                            placeholder="e.g., Hey Garud"
                         />
                         <button
                             onClick={handleSetWakeUpWord}

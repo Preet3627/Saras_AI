@@ -121,7 +121,7 @@ STATE = {
     "seen_entities": set(),
     "is_running": True,
     "custom_responses": {}, # Stores question:answer pairs
-    "wake_word": "hey saras" # Default wake word
+    "wake_word": "hey garud" # Default wake word
 }
 
 # --- Initialization ---
@@ -240,7 +240,7 @@ def autopilot_loop():
 # --- API Endpoints ---
 @app.route('/')
 def index():
-    return "Saras AI Robot API is running."
+    return "Garud AI Robot API is running."
 
 @app.route('/command', methods=['POST'])
 def handle_command():
@@ -289,7 +289,7 @@ def handle_command():
         return jsonify(status="success", message="Listening...")
 
     elif command == 'introduce_gujarati':
-        intro_text = "હું એક AI રોબોટ છું, મારું નામ સારસ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે."
+        intro_text = "હું એક AI રોબોટ છું, મારું નામ ગરુડ છે અને મને PM શ્રી પ્રાથમિક વિદ્યામંદિર પોણસરી દ્વારા વિકસાવવામાં આવ્યો છે."
         text_to_speech.speak(intro_text, lang="gu")
         return jsonify(status="success", message=intro_text)
     
@@ -464,34 +464,44 @@ class Camera:
         return None
 `,
   'core/gemini_ai.py': `import os
-import google.generativeai as genai
+from google.generativeai import GenerativeModel
 from PIL import Image
+
+# This code is using the new Google AI SDK
+from gemini.client import GoogleGenAI
+from gemini.types.content import Part
 
 # Configure the API key from environment variables
 api_key = os.environ.get("API_KEY")
 if not api_key:
     raise ValueError("API_KEY not found in environment variables. Please set it in your .env file.")
-genai.configure(api_key=api_key)
 
-# Initialize the generative model
-model = genai.GenerativeModel('gemini-2.5-flash')
+# Correct initialization
+ai = GoogleGenAI(api_key=api_key)
 
-def get_gemini_response(prompt_text, image_path=None):
+async def get_gemini_response(prompt_text, image_path=None):
     """
     Gets a response from the Gemini API, with an optional image.
-    This is a synchronous function.
+    This is now an async function.
     """
     try:
         if image_path:
             if not os.path.exists(image_path):
                 return "Error: Image file not found."
             
-            img = Image.open(image_path)
-            # The model can take a list of mixed text and image parts
-            response = model.generate_content([prompt_text, img])
+            img_part = Part.from_uri(
+                uri=image_path,
+                mime_type="image/jpeg",
+            )
+            response = await ai.generate_content(
+                model="gemini-2.5-flash",
+                contents=[prompt_text, img_part],
+            )
         else:
-            # For text-only prompts
-            response = model.generate_content(prompt_text)
+            response = await ai.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt_text,
+            )
         
         return response.text
     except Exception as e:

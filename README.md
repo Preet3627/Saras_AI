@@ -11,6 +11,8 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 1.  **Robot Backend (Python + Flask):** A web server runs on the Raspberry Pi, listening for commands via a local network API. It controls the robot's hardware, runs computer vision models, and communicates with the Google Gemini API.
 2.  **Web Frontend (React - This App):** A user-friendly dashboard that runs in your browser. You use it to send commands to the robot, configure its responses, and see a live log of its activities.
 
+<img width="1366" height="768" alt="Screenshot 2025-09-02 200444" src="https://github.com/user-attachments/assets/b6eb956e-b609-4b2c-aa17-3bc3c03434ec" />
+<img width="970" height="600" alt="image" src="https://github.com/user-attachments/assets/a81f1eb5-9955-40fb-9e9f-8ac95874ab63" />
 
 
 ## Features
@@ -120,3 +122,5 @@ To make your robot truly autonomous, you should configure the Python server to s
 Sources:
 https://www.yahboom.net/study/RASPBOT-V2
 Google AI studio [Main Devloper]
+<img width="1366" height="768" alt="Screenshot 2025-09-02 200503" src="https://github.com/user-attachments/assets/cd9fb8aa-be6b-4014-ac2f-b6cc15382e2a" />
+

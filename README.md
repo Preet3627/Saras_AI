@@ -115,3 +115,8 @@ To make your robot truly autonomous, you should configure the Python server to s
 -   **Frontend (This Guide):** React, TypeScript, Tailwind CSS
 -   **Backend (On Robot):** Python, Flask, OpenCV, google-generativeai
 -   **Communication:** REST API over local network
+
+
+Sources:
+https://www.yahboom.net/study/RASPBOT-V2
+Google AI studio [Main Devloper]

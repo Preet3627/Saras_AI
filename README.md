@@ -12,6 +12,10 @@ This project was developed for **PM SHRI PRATHMIK VIDHYAMANDIR PONSRI**.
 2.  **Web Frontend (React - This App):** A user-friendly dashboard that runs in your browser. You use it to send commands to the robot, configure its responses, and see a live log of its activities.
 
 <img width="1366" height="768" alt="Screenshot 2025-09-02 200444" src="https://github.com/user-attachments/assets/b6eb956e-b609-4b2c-aa17-3bc3c03434ec" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/5691e2c4-7f8d-4021-b6e1-e29449c45ad9" />
+<img width="1366" height="768" alt="image" src="https://github.com/user-attachments/assets/72fa49ac-7d83-44fe-9267-0f9bcb8bf651" />
+
+
 <img width="970" height="600" alt="image" src="https://github.com/user-attachments/assets/a81f1eb5-9955-40fb-9e9f-8ac95874ab63" />
 
 

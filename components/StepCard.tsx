@@ -1,7 +1,5 @@
-
 import React, { useState } from 'react';
 import type { Step } from '../types';
-import { CodeBlock } from './CodeBlock';
 import { ChevronDownIcon } from './Icons';
 
 interface StepCardProps {
@@ -11,39 +9,38 @@ interface StepCardProps {
 
 export const StepCard: React.FC<StepCardProps> = ({ step, index }) => {
   const [isOpen, setIsOpen] = useState(index === 0);
+  const Icon = step.icon;
 
   return (
-    <div className="border border-gray-700/50 bg-gray-800/40 rounded-lg shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-cyan-400/50">
+    <div className="bg-gray-800/40 border border-gray-700/50 rounded-lg overflow-hidden transition-all duration-300">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-6 text-left"
+        className="w-full flex items-center justify-between p-4 text-left focus:outline-none"
+        aria-expanded={isOpen}
+        aria-controls={`step-content-${step.id}`}
       >
         <div className="flex items-center">
-          <div className="flex-shrink-0 h-12 w-12 rounded-full bg-gray-700 border-2 border-gray-600 flex items-center justify-center mr-5">
-            <step.icon className="h-6 w-6 text-cyan-400" />
+          <div className="flex-shrink-0 bg-gray-700 rounded-full h-8 w-8 flex items-center justify-center mr-4">
+            <Icon className="h-5 w-5 text-cyan-400" />
           </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-100">{step.title}</h2>
-            <p className="text-sm text-gray-400">Step {step.id}</p>
-          </div>
+          <span className="font-semibold text-white">{`${index + 1}. ${step.title}`}</span>
         </div>
         <ChevronDownIcon
-          className={`h-6 w-6 text-gray-400 transition-transform duration-300 ${
+          className={`h-6 w-6 text-gray-400 transform transition-transform duration-300 ${
             isOpen ? 'rotate-180' : ''
           }`}
         />
       </button>
-
-      <div
-        className={`overflow-hidden transition-all duration-500 ease-in-out ${
-          isOpen ? 'max-h-[2000px]' : 'max-h-0'
-        }`}
-      >
-        <div className="px-6 pb-6 pt-0">
-          <p className="text-gray-300 leading-relaxed whitespace-pre-line mb-6">{step.description}</p>
-          {step.code && <CodeBlock code={step.code} />}
+      {isOpen && (
+        <div id={`step-content-${step.id}`} className="p-4 pt-0">
+          <p className="text-gray-300 mb-4">{step.description}</p>
+          {step.code && (
+            <pre className="bg-black/50 p-4 rounded-md text-sm text-cyan-200 overflow-x-auto font-mono">
+              <code>{step.code.trim()}</code>
+            </pre>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
